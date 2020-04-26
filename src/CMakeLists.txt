@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.10)
+project(imgex VERSION 0.01)
+add_executable(imgex main.cc xwin.cc image.cc)
+target_link_libraries(imgex X11 IL ILU ILUT)
+target_compile_features(imgex PUBLIC cxx_std_20)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED True)

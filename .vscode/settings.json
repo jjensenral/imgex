@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "iostream": "cpp"
+    },
+    "C_Cpp.intelliSenseEngineFallback": "Enabled",
+    "C_Cpp.loggingLevel": "Warning"
+}

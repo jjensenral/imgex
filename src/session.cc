@@ -1,4 +1,4 @@
-#include "session.h"
+#include "session.hh"
 
 
 
@@ -16,11 +16,11 @@ Session::persist(char const *filename)
 }
 
 void
-Session::Session lock()
+Session::lock()
 {
 }
 
 void
-Session::Session unlock()
+Session::unlock()
 {
 }

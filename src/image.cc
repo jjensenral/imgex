@@ -53,6 +53,13 @@ Image::~Image() noexcept
 }
 
 
+/* Transformable implementation */
+void
+Image::apply(transform const &)
+{
+}
+
+
 std::string
 Image::getFilename() const noexcept
 {

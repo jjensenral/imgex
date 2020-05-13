@@ -145,6 +145,12 @@ XILImage::resize()
 }
 
 
+void
+XILImage::apply(transform const &)
+{
+}
+
+
 bool
 XILImage::process(XEvent const &ev)
 {
@@ -198,20 +204,6 @@ XILImage::process(XEvent const &ev)
 		resize();
 	}
 	return false;
-}
-
-
-void
-XILImage::apply(workflow const &w)
-{
-	// workflow is defined in common.hh
-	for( auto const &t : w ) apply(t);
-}
-
-
-void
-XILImage::apply(transform const &t)
-{
 }
 
 

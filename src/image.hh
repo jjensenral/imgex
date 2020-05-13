@@ -30,7 +30,7 @@ public:
 	image may be in multiple files and may have processes done to it
 	independent of its rendering in a window. */
 
-class Image final {
+class Image final : public Transformable {
 	// TODO: checksum
 	ImageFile const imgf_;
 public:
@@ -38,6 +38,8 @@ public:
 	~Image();
 	/** Returns a filename (basename) identifying the file */
 	std::string getFilename() const noexcept;
+	/** Transformable visitor entry point for being visited by a transform */
+	void apply(transform const &) override;
 };
 
 

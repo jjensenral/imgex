@@ -87,7 +87,7 @@ class XRoot final {
 
 
 
-class XILImage final : public EventProcessor {
+class XILImage final : public EventProcessor, public Transformable {
  private:
 	/** placement on window; width and height equivalent to the original image size times scale */
 	box wbox_;
@@ -118,6 +118,9 @@ class XILImage final : public EventProcessor {
 	/** Resize window and image to size relative to original image */
 	void resize();
 
+	/** Entry point for being visited by a transform */
+	void apply(transform const &) override;
+
 public:
 	XILImage(XWindow &, Image const &);
 	~XILImage() noexcept;
@@ -135,10 +138,6 @@ public:
 	/** Process event */
 	bool process(XEvent const &) override;
 
-	/** Application of transformation */
-	void apply( transform const & );
-	/** Or a list of transformations */
-	void apply( workflow const & );
 	/** Map or move window */
 	void map();
 };

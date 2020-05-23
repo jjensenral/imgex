@@ -3,145 +3,84 @@
 #include <iterator>
 #include <exception>
 #include <algorithm>
+#include <memory>
+
+#include <QGuiApplication>
+#include <QImage>
+#include <QPainter>
+#include <QString>
+#include <QSize>
+#include <QMouseEvent>
+#include <QWheelEvent>
 
 
 
-
-/** This value will be set by XWindow (and will be the same for any
-	XWindow) */
-Display *EventProcessor::disp_ = nullptr;
-
-
-XRoot::XRoot(char const *display): disp_(XOpenDisplay(display))
+XILImage::XILImage(XWindow &xw, Image const &img) : QWindow(&xw), Transformable(),
+							    wbox_(), canvas_(this), work_(), orig_(img.getFilename()),
+							    locX(0), locY(0), track_(false), focused_(false),
+								resize_on_zoom_(true),
+							    zoom_(1.0f)
 {
-	if(!disp_)
-		throw "couldn't open display";
-
-	screen_ = DefaultScreen(disp_);
-	cm_ = DefaultColormap(disp_, screen_);
-
-	if( XParseColor(disp_, cm_, "Red", &bd_) == 0 \
-		|| XParseColor(disp_, cm_, "Black", &fg_) == 0 \
-		|| XParseColor(disp_, cm_, "Black", &bg_) == 0
-		|| XAllocColor(disp_, cm_, &bd_) == 0 \
-		|| XAllocColor(disp_, cm_, &fg_) == 0 \
-		|| XAllocColor(disp_, cm_, &bg_) == 0) {
-		throw "Failed to allocate colours";
-	}
-	
-	scr_w_ = DisplayWidth(disp_, screen_);
-	scr_h_ = DisplayHeight(disp_, screen_);
-	
-	/*
-	scr_w_ = WidthOfScreen(screen_);
-	scr_h_ = HeightOfScreen(screen_);
-	*/
-	ilInit();
-	iluInit();
-	ilutInit();
-}
-
-
-XRoot::~XRoot() {
-	XCloseDisplay(disp_);
-	disp_ = nullptr;
-}
-
-
-XILImage::XILImage(XWindow &xw, Image const &img) : EventProcessor(img.getFilename()),
-							    wbox_(), img_(nullptr), work_(0),
-							    orig_(0), locX(0), locY(0), track_(false),
-							    zoom_(1.0)
-{
-	// disp_ is shared through base class
-	gc_ = xw.get_gc();
-	ILuint ids[2];		// guaranteed consecutive
-	ilGenImages(2, ids);
-	work_ = ids[0]; orig_ = ids[1];
-	wbox_ = loadOrig(img);
-	win_ = xw.mksubwin(wbox_);
-	img_ = nullptr;
+	// TODO: Apply any processing to orig_
+	wbox_ = orig_.rect();
+	qWarning("Loaded %s geometry (%d,%d,%d,%d)", qPrintable(img.getFilename()),wbox_.x(),wbox_.y(),wbox_.width(),wbox_.height());
+	setGeometry(orig_.rect());
+	canvas_.resize(orig_.size());
 	// workCopy (re)sets wbox and sets img_
 	workCopy();
+	show();
 }
 
 
 XILImage::~XILImage()
 {
-	if(img_)
-		XDestroyImage(img_);
-	// The windows need to be destroyed by the parent
-	//    XDestroyWindow(disp_, win_);
-	img_ = nullptr;
-}
-
-
-box
-XILImage::loadOrig(Image const &img)
-{
-	ilBindImage(orig_);
-	if(!ilLoadImage(img.getFilename().c_str())) {
-		throw "Failed to load " + img.getFilename();
-	}
-	// TODO: First set of transforms apply to orig
-	// Then define the box
-	box b;
-	b.w = static_cast<decltype(b.w)>(ilGetInteger(IL_IMAGE_WIDTH));
-	b.h = static_cast<decltype(b.h)>(ilGetInteger(IL_IMAGE_HEIGHT));
-	return b;
 }
 
 
 void
 XILImage::workCopy()
 {
-	ilBindImage(work_);
-	ilCopyImage(orig_);
-	wbox_.w = static_cast<decltype(wbox_.w)>(ilGetInteger(IL_IMAGE_WIDTH));
-	wbox_.h = static_cast<decltype(wbox_.h)>(ilGetInteger(IL_IMAGE_HEIGHT));
-	if(img_) XDestroyImage(img_);
-	img_ = nullptr;
+	work_ = orig_.copy();
+	wbox_ = work_.rect();
 }
 
 
 void
-XILImage::map()
+XILImage::render()
 {
-	if(!img_) {
-		ilBindImage(work_);
-		img_ = ilutXCreateImage(disp_);
-		if(!img_)
-		    throw "Cannot create X Image";
+	if(!isExposed())
+		return;
+	canvas_.beginPaint(wbox_);
+	QPaintDevice *pd = canvas_.paintDevice();
+	if(!pd) {
+		qWarning("Unable to get paint device");
+		canvas_.endPaint();
+		return;
 	}
-	//    XClearArea(disp, win, wbox_.x, wbox_.y, wbox_.w, wbox_.h, 0);
-	XPutImage(disp_, win_, gc_, img_,
-		      0, 0,		// src x and y
-		      0, 0,		// dst x and y relative to own subwindow
-		      wbox_.w, wbox_.h);
-	XFlush(disp_);
+	// To call, we need an old fashioned C pointer
+	QPainter p(pd);
+	p.drawPixmap(wbox_.x(), wbox_.y(), work_);
+	p.end();
+	canvas_.endPaint();				// also frees pd
+	canvas_.flush(wbox_, this);
 }
 
 
 void
-XILImage::resize()
+XILImage::resize(bool resize_window)
 {
-	workCopy();			// deletes img_ and resets work copy and wbox
-	int depth{ilGetInteger(IL_IMAGE_DEPTH)};
-	decltype(wbox_.w) width{static_cast<decltype(wbox_.w)>(static_cast<float>(wbox_.w) * zoom_+0.999f)};
-	decltype(wbox_.h) height{static_cast<decltype(wbox_.h)>(static_cast<float>(wbox_.h) * zoom_+0.999f)};
-	if(	iluScale(width, height, depth) ) {
-		XResizeWindow(disp_, win_, width, height);
-		try {
-		    map();
-		} catch(char const *) {
-		    // ignore for now, leaving window blank
-		    XFillRectangle(disp_, win_, gc_, 0, 0, width, height);
-		    return;
-		}
-		wbox_.w = width;
-		wbox_.h = height;
+	workCopy();			// resets work copy and wbox
+	// Target size
+	QSize size{ wbox_.size() };
+	size.setHeight( size.height() * zoom_ + 0.99f );
+	size.setWidth( size.width() * zoom_ + 0.99f );
+	work_.scaled(wbox_.size(), Qt::KeepAspectRatio);
+	wbox_.setSize( work_.size() );
+	if( resize_window ) {
+		QWindow::resize(wbox_.size());
+		canvas_.resize(wbox_.size());
 	}
-	return;
+	render();
 }
 
 
@@ -151,107 +90,76 @@ XILImage::apply(transform const &)
 }
 
 
-bool
-XILImage::process(XEvent const &ev)
+void
+XILImage::mousePressEvent(QMouseEvent *ev)
 {
-	//fprintf(stderr, "process %s, %d\n", name_.c_str(), ev.type);
-	bool need_resize = false;
-	switch(ev.type) {
-	case MotionNotify:
-		moveto(ev.xmotion.x_root - locX, ev.xmotion.y_root - locY);
+	switch(ev->button()) {
+	case Qt::LeftButton:
+	    locX = ev->globalX() - wbox_.x();
+	    locY = ev->globalY() - wbox_.y();
+		track_ = true;
+	    break;
+	case Qt::MiddleButton:
+		zoom_ = 1.0f;
+		resize(resize_on_zoom_);
 		break;
-	case Expose:
-		XClearArea(disp_, win_,
-			   ev.xexpose.x, ev.xexpose.y,
-			   ev.xexpose.width, ev.xexpose.height, 0);
-		XPutImage(disp_, win_, gc_, img_,
-			  0, 0,		// src x and y
-			  0, 0,		// dst x and y relative to own subwindow
-			  wbox_.w, wbox_.h);
+	case Qt::RightButton:
 		break;
-	case ButtonPress:
-		switch(ev.xbutton.button) {
-		case Button1:
-		    locX = ev.xbutton.x_root - wbox_.x;
-		    locY = ev.xbutton.y_root - wbox_.y;
-		    break;
-		case Button4:
-		    /* Button 4 is mouse wheel forward - zoom in */
-		    zoom_ *= 1.1;
-		    need_resize = true;
-		    break;
-		case Button5:
-		    /* Button 5 is mouse wheel backward - zoom out */
-		    zoom_ /= 1.1;
-		    need_resize = true;
-		    break;
-		case Button2:
-		    /* Button 2 is pressing middle mouse button/wheel */
-		    if(zoom_ != 1.0) {
-			zoom_ = 1.0;
-			need_resize = true;
-		    }
-		    break;
-		case Button3:
-		    /* Button 3 is right mouse button (or left if you have a left handed mouse) */
-		    return true;
-		}
+	default:
 		break;
-	case ButtonRelease:
+	}
+}
+
+
+void
+XILImage::mouseReleaseEvent(QMouseEvent *ev)
+{
+	switch(ev->button()) {
+	case Qt::LeftButton:
 		track_ = false;
+	default:
+		break;
 	}
-	if(need_resize) {
-		resize();
+}
+
+
+void
+XILImage::mouseMoveEvent(QMouseEvent *)
+{
+	//if(track_) 
+}
+
+
+void
+XILImage::wheelEvent(QWheelEvent *ev)
+{
+	if(focused_) {
+		if(ev->angleDelta().y() > 0)
+			zoom_ /= 1.1;
+		else
+			zoom_ *= 1.1;
+		resize(resize_on_zoom_);
 	}
-	return false;
 }
 
 
 
-XWindow::XWindow(XRoot const &xr) : EventProcessor("XWindow"), xroot_(xr)
-{
-	disp_ = xr.disp_;		// this value is always the same
-	win_ = XCreateSimpleWindow(xr.disp_,
-				       DefaultRootWindow(xr.disp_),
-				       0, 0,
-				       xr.scr_w_, xr.scr_h_,
-				       0, // default border width
-				       xr.bg_.pixel, xr.bg_.pixel);
-	if(!win_)
-		throw "Failed to create window";
-	// XSizeHints xsh;
-	XGCValues xgcv;
-	xgcv.foreground = xr.fg_.pixel;
-	xgcv.background = xr.bg_.pixel;
-	gc_ = XCreateGC( xr.disp_, win_, GCForeground | GCBackground, &xgcv );
-	if(!gc_) {
-		XDestroyWindow(xr.disp_, win_);
-		throw "Failed to create graphics context";
-	}
-	XSetWindowAttributes xswa;
-	xswa.colormap = xr.cm_;
-	xswa.bit_gravity = NorthWestGravity;
-	XChangeWindowAttributes(xr.disp_, win_, CWColormap|CWBitGravity, &xswa);
 
-	//    XSelectInput(xr.disp_, win_, ExposureMask|ButtonPressMask|Button1MotionMask);
-	XSelectInput(xr.disp_, win_, ExposureMask);
-	XMapWindow(xr.disp_, win_);
-	XFlush(xr.disp_);
+XWindow::XWindow() : QWindow(static_cast<QWindow *>(nullptr))
+{
+	//showMaximized();
 }
 
 
 XWindow::~XWindow()
 {
-	XFreeGC(xroot_.disp_, gc_);
-	XDestroySubwindows(xroot_.disp_, win_);
-	XDestroyWindow(xroot_.disp_, win_);
 }
 
 
 XILImage *
-XWindow::img_at(coord x, coord y) noexcept
+XWindow::img_at(int x, int y) noexcept
 {
-	// We must find the last image that contains the point
+	// We must find the last (highest in stack) image that contains the point
 	std::reverse_iterator<std::list<XILImage>::iterator>
 		p = ximgs_.rbegin(), q = ximgs_.rend();
 	// Annoyingly, std::find_if refuses to work with reverse iterators
@@ -263,26 +171,28 @@ XWindow::img_at(coord x, coord y) noexcept
 }
 
 
-Window
-XWindow::mksubwin(box const &b)
+void
+XWindow::exposeEvent(QExposeEvent *)
 {
-	Window w = XCreateSimpleWindow(xroot_.disp_, win_,
-					   b.x, b.y, b.w, b.h,
-					   1, xroot_.bd_.pixel, xroot_.bg_.pixel);
-	XSelectInput(xroot_.disp_, w, ExposureMask|ButtonPressMask|Button1MotionMask);
-	XMapWindow(xroot_.disp_, w);
-	return w;
+	for( XILImage &x : ximgs_ )
+		x.render();
 }
 
 
+void
+XWindow::mousePressEvent(QMouseEvent *)
+{}
+
+
+/*
 bool
 XWindow::process(XEvent const &ev)
 {
 	//fprintf(stderr, "process XWindow, %d\n", ev.type);
 
-	/* Variables used for tracking (while moving an image within a
-	   window) - there is at most one tracking active at any given
-	   time */
+	// Variables used for tracking (while moving an image within a
+	// window) - there is at most one tracking active at any given
+	// time
 	bool need_resize = false;
 	XILImage *which = nullptr;
 	
@@ -300,7 +210,7 @@ XWindow::process(XEvent const &ev)
 	}
 	return false;
 }
-
+*/
 
 
 /*
@@ -319,75 +229,10 @@ XWindow::expose(box const &b)
 */
 
 
-EventProcessor *
-XWindow::recipient(XEvent const &ev) noexcept
-{
-	if( who_me(ev) )
-		return this;
-	auto k = std::find_if(ximgs_.begin(), ximgs_.end(),
-				  [&ev](XILImage const &x) { return x.who_me(ev); });
-	if( k != ximgs_.end() )
-		return &(*k);
-	return nullptr;
-}
-
-
-XMain::XMain(char const *display): xroot_(display), wins_()
-{
-}
-
-
- XMain::~XMain()
-{
-}
-
 
 void
-XMain::mkimage(int no, ImageFile const &fn)
+XWindow::mkimage(ImageFile const &fn)
 {
-	// can't happen?
-	if(wins_.empty())
-		throw "No windows defined";
 	const Image img(fn);
-	XWindow &w = at(no);
-	// as of C++17, emplace_back returns the reference
-	XILImage &xim = w.ximgs_.emplace_back(w, img);
-	xim.map();
-}
-
-
-void
-XMain::flush()
-{
-	XFlush(xroot_.disp_);
-}
-
-
-XWindow &
-XMain::at(int k)
-{
-	std::list<XWindow>::iterator p = wins_.begin(), q = wins_.end();
-	while(k-- && p++ != q);    // doesn't matter if we decrement below zero
-	if(p == q)
-		throw std::out_of_range("XMain::at");
-	return *p;
-}
-
-
-void
-XMain::run()
-{
-	// Start an event processing loop
-	bool done = false;
-	while(!done) {
-		XEvent ev;
-		XNextEvent(xroot_.disp_, &ev);
-		for( EventProcessor *who; auto &win : wins_ ) {
-		    who = win.recipient(ev);
-		    if(who) {
-			done |= who->process(ev);
-			break;
-		    }
-		}
-	}
+	ximgs_.emplace_back(*this, img);
 }

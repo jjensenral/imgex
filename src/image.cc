@@ -1,39 +1,47 @@
 #include "image.hh"
-#include <iostream>
-#include <fstream>
 #include <cstdlib>
+#include <QFile>
+#include <QString>
 
 
-
-/** Images are loaded from removable media - we aim to remember which
+/** This class is an abstract representation of the file.
+ * It represents the right filename and checksum, but independent of storage location.
+ * 
+ * Images are loaded from removable media - we aim to remember which
  * drive each image came from.  The short term solution for this is to
  * store a one-byte file with the drive letter. */
-static std::string driveletter("drive");
+static QString driveletter("drive");
 
-ImageFile::ImageFile( std::string const &fn )
+ImageFile::ImageFile( QString const &fn )
 {
 	/** This location is used only for test/development */
-	std::string mount{"/Pictures/"};
+	QString mount{"/Pictures/"};
 	char const *home = getenv("HOME");
 	if( home )
 		    mount = home + mount;
-	if(!mount.ends_with('/'))
+	if(!mount.endsWith('/'))
 	    mount += '/';
 
 	path_ = mount + fn;
+/*
+	QString filename(path_.c_str());
+
 	// raise exception unless file exists and is readable (we open it as an image later)
-	std::ifstream img(path_);
-	img.exceptions(img.failbit);
+	QFile img(filename);
+*/
 	// TODO: checksum the file
 	// read the drive letter which should be in a fixed location
-	std::ifstream drive(mount + driveletter);
-	if( drive.fail() ) {
+/*
+	QFile drive(filename);
+	if( !drive.open(QIODevice::ReadOnly | QIODevice::Text) ) {
 		    std::cerr << "No drive indicator\n";
 	} else {
 		    char d;
-		    drive >> d;
+			// XXX
+		    ;
 		    drives_.insert(d);
 	}
+*/
 }
 
 
@@ -60,7 +68,7 @@ Image::apply(transform const &)
 }
 
 
-std::string
+QString
 Image::getFilename() const noexcept
 {
 	return imgf_.getPath();

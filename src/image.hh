@@ -3,7 +3,7 @@
 
 
 #include <set>
-#include <string>
+#include <QString>
 #include "common.hh"
 
 
@@ -13,15 +13,15 @@
  * */
 
 class ImageFile final {
-	std::string path_;
+	QString path_;
 	// status
 	/** Drives this file is located on */
 	std::set<char> drives_;
 public:
 	// can throw std::ios_base::failure
-	ImageFile(const std::string &path);
+	ImageFile(const QString &path);
 	~ImageFile() noexcept;
-	std::string const &getPath() const noexcept { return path_; }
+	QString getPath() const noexcept { return path_; }
 };
 
 
@@ -37,7 +37,7 @@ public:
 	Image( ImageFile const &imgf );
 	~Image();
 	/** Returns a filename (basename) identifying the file */
-	std::string getFilename() const noexcept;
+	QString getFilename() const noexcept;
 	/** Transformable visitor entry point for being visited by a transform */
 	void apply(transform const &) override;
 };

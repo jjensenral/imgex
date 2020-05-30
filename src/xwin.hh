@@ -38,8 +38,12 @@ class XILImage final : public QWindow, public Transformable {
 	/** keep the original image and a working copy */
 	QPixmap work_, orig_;
 
+	/** Parent window */
+	QWindow *parent_;
+
 	/** Base coordinates for tracking movement, relative to root window */
-	int locX, locY;
+	QPoint loc;
+
 	/** Whether this window is being moved, need to track movement */
 	bool track_;
 	/** Whether this window is focused */
@@ -49,11 +53,14 @@ class XILImage final : public QWindow, public Transformable {
 
 	/** scaling factor */
 	float zoom_;
+
+	QString name_;
+
 	/** (Re)copy orig to working copy */
 	void workCopy();
 
 	/** Render the image in the window */
-	void render();
+	void render(QRect);
 
 	/** Move window */
 	void moveto(int x, int y) noexcept
@@ -71,7 +78,7 @@ class XILImage final : public QWindow, public Transformable {
 	void apply(transform const &) override;
 
 public:
-	XILImage(XWindow &, Image const &);
+	XILImage(XWindow &, Image const &, QString);
 	~XILImage() noexcept;
 	XILImage(XILImage const &) = delete;
 	XILImage(XILImage &&) = default;
@@ -81,16 +88,20 @@ public:
 	// void clear(Display *d, Window w) const { XClearArea(d, w, wbox_.x, wbox_.y, wbox_.h, wbox_.y, 0); }
 	/** Does this image contain point x,y (as mapped on window) */
 	bool contains(int x, int y) const noexcept { return wbox_.contains(x,y); }
+	bool contains(QPoint p) const noexcept { return wbox_.contains(p); }
 	/** Does this image intersect a given box? */
 	bool intersects(QRect const &b) const noexcept { return wbox_.intersects(b); }
 	
 	/** Events, as defined by QWindow */
-	void focusInEvent(QFocusEvent *) override { focused_ = true; };
-	void focusOutEvent(QFocusEvent *) override { focused_ = false; };
+	/*
+	void focusInEvent(QFocusEvent *) override { qWarning("  Focus %s", qPrintable(name_)); focused_ = true; };
+	void focusOutEvent(QFocusEvent *) override { qWarning("Unfocus %s", qPrintable(name_)); focused_ = false; };
+	*/
 	void mousePressEvent(QMouseEvent *) override;
 	void mouseReleaseEvent(QMouseEvent *) override;
 	void mouseMoveEvent(QMouseEvent *) override;
 	void wheelEvent(QWheelEvent *) override;
+	void exposeEvent(QExposeEvent *) override;
 
 	friend class XWindow;
 };
@@ -104,10 +115,8 @@ public:
 class XWindow final : public QWindow {
 	/** List of images, lowest first */
 	std::list<XILImage> ximgs_;
-	// typedef std::list<XILImage>::iterator XILImageItr;
 	/** Return a ptr to image at x,y or nullptr if there isn't one */
-	XILImage *img_at(int, int) noexcept;
-	/** Tracking image (across events) */
+	XILImage *img_at(auto args...) noexcept;
  public:
 	XWindow();
 	~XWindow() noexcept;
@@ -117,10 +126,13 @@ class XWindow final : public QWindow {
 	XWindow &operator=(XWindow &&) = default;
 
 	/** Make an image in this window */
-	void mkimage(ImageFile const &);
-	/** Process event */
-	void exposeEvent(QExposeEvent *) override;
+	void mkimage(ImageFile const &, QString);
+	/** Events may be received by the main window, in which case the event needs dispatching to the child window */
 	void mousePressEvent(QMouseEvent *) override;
+	void mouseReleaseEvent(QMouseEvent *) override;
+	void mouseMoveEvent(QMouseEvent *) override;
+	void wheelEvent(QWheelEvent *) override;
+	void exposeEvent(QExposeEvent *) override;
 
 	/** handle expose */
 	void expose(QRect const &);

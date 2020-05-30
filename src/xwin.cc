@@ -15,15 +15,14 @@
 
 
 
-XILImage::XILImage(XWindow &xw, Image const &img) : QWindow(&xw), Transformable(),
+XILImage::XILImage(XWindow &xw, Image const &img, QString name) : QWindow(&xw), Transformable(),
 							    wbox_(), canvas_(this), work_(), orig_(img.getFilename()),
-							    locX(0), locY(0), track_(false), focused_(false),
+							    parent_(&xw), loc(0,0), track_(false), focused_(false),
 								resize_on_zoom_(true),
-							    zoom_(1.0f)
+							    zoom_(1.0f), name_(name)
 {
 	// TODO: Apply any processing to orig_
 	wbox_ = orig_.rect();
-	qWarning("Loaded %s geometry (%d,%d,%d,%d)", qPrintable(img.getFilename()),wbox_.x(),wbox_.y(),wbox_.width(),wbox_.height());
 	setGeometry(orig_.rect());
 	canvas_.resize(orig_.size());
 	// workCopy (re)sets wbox and sets img_
@@ -46,11 +45,15 @@ XILImage::workCopy()
 
 
 void
-XILImage::render()
+XILImage::render(QRect reg)
 {
 	if(!isExposed())
 		return;
-	canvas_.beginPaint(wbox_);
+	if(reg.isNull())
+		reg = wbox_;
+	else if(!wbox_.intersects(reg))
+		return;
+	canvas_.beginPaint(reg);
 	QPaintDevice *pd = canvas_.paintDevice();
 	if(!pd) {
 		qWarning("Unable to get paint device");
@@ -80,7 +83,7 @@ XILImage::resize(bool resize_window)
 		QWindow::resize(wbox_.size());
 		canvas_.resize(wbox_.size());
 	}
-	render();
+	render(wbox_);
 }
 
 
@@ -95,8 +98,8 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 {
 	switch(ev->button()) {
 	case Qt::LeftButton:
-	    locX = ev->globalX() - wbox_.x();
-	    locY = ev->globalY() - wbox_.y();
+	// locX = ev.xbutton.x_root - wbox_.x; locY = ev.xbutton.y_root - wbox_.y;
+	    loc = ev->globalPos() - wbox_.topLeft();
 		track_ = true;
 	    break;
 	case Qt::MiddleButton:
@@ -124,9 +127,15 @@ XILImage::mouseReleaseEvent(QMouseEvent *ev)
 
 
 void
-XILImage::mouseMoveEvent(QMouseEvent *)
+XILImage::mouseMoveEvent(QMouseEvent *ev)
 {
-	//if(track_) 
+	// moveto(ev.xmotion.x_root - locX, ev.xmotion.y_root - locY);
+	// Only move if we are in track mode and docked with the main window
+	if(track_ && !isTopLevel()) {
+		auto q = ev->globalPos() - loc;
+		setPosition(q);
+		wbox_.setTopLeft(q);
+	}
 }
 
 
@@ -143,6 +152,11 @@ XILImage::wheelEvent(QWheelEvent *ev)
 }
 
 
+void
+XILImage::exposeEvent(QExposeEvent *ev)
+{
+	render(ev->region().boundingRect());
+}
 
 
 XWindow::XWindow() : QWindow(static_cast<QWindow *>(nullptr))
@@ -157,14 +171,13 @@ XWindow::~XWindow()
 
 
 XILImage *
-XWindow::img_at(int x, int y) noexcept
+XWindow::img_at(auto args...) noexcept
 {
 	// We must find the last (highest in stack) image that contains the point
-	std::reverse_iterator<std::list<XILImage>::iterator>
-		p = ximgs_.rbegin(), q = ximgs_.rend();
+	std::reverse_iterator<std::list<XILImage>::iterator> p = ximgs_.rbegin(), q = ximgs_.rend();
 	// Annoyingly, std::find_if refuses to work with reverse iterators
 	while( p != q ) {
-		if( p->contains(x,y) ) return &(*p);
+		if( p->contains(args) ) return &(*p);
 		++p;
 	}
 	return nullptr;
@@ -172,67 +185,53 @@ XWindow::img_at(int x, int y) noexcept
 
 
 void
-XWindow::exposeEvent(QExposeEvent *)
+XWindow::exposeEvent(QExposeEvent *ev)
 {
+	QRect bbox(ev->region().boundingRect());
 	for( XILImage &x : ximgs_ )
-		x.render();
+		x.render(QRect());
 }
 
 
 void
-XWindow::mousePressEvent(QMouseEvent *)
-{}
-
-
-/*
-bool
-XWindow::process(XEvent const &ev)
+XWindow::mousePressEvent(QMouseEvent *ev)
 {
-	//fprintf(stderr, "process XWindow, %d\n", ev.type);
-
-	// Variables used for tracking (while moving an image within a
-	// window) - there is at most one tracking active at any given
-	// time
-	bool need_resize = false;
-	XILImage *which = nullptr;
-	
-	switch(ev.type) {
-	case Expose:
-		if( ev.xany.window == win_ ) { // main window
-		    XClearArea(xroot_.disp_, win_,
-			       ev.xexpose.x, ev.xexpose.y,			\
-			       ev.xexpose.width, ev.xexpose.height, 0);
-		    XFillRectangle(xroot_.disp_, win_, gc_,
-				   ev.xexpose.x, ev.xexpose.y,			\
-				   ev.xexpose.width, ev.xexpose.height);
-		}
-		break;
-	}
-	return false;
+	XILImage *w = img_at(ev->globalPos());
+	if(!w) return;
+	w->mousePressEvent(ev);
 }
-*/
 
 
-/*
 void
-XWindow::expose(box const &b)
+XWindow::mouseReleaseEvent(QMouseEvent *ev)
 {
-	XClearArea(xroot_.disp_, win_, b.x, b.y, \
-		       static_cast<int>(b.w), static_cast<int>(b.h), 0);
-	//XClearArea(xroot_.disp_, win_, 0, 0, 0, 0, 0);
-	if constexpr(true)
-			    map_all();
-	else
-	std::for_each(ximgs_.rbegin(), ximgs_.rend(),
-			  [this,&b](XILImage &x) { if(x.intersects(b)) x.map(*this); });
+	XILImage *w = img_at(ev->globalPos());
+	if(!w) return;
+	w->mouseReleaseEvent(ev);
 }
-*/
-
 
 
 void
-XWindow::mkimage(ImageFile const &fn)
+XWindow::mouseMoveEvent(QMouseEvent *ev)
+{
+	XILImage *w = img_at(ev->globalPos());
+	if(!w) return;
+	w->mouseMoveEvent(ev);
+}
+
+
+void
+XWindow::wheelEvent(QWheelEvent *ev)
+{
+	XILImage *w = img_at(ev->globalPos());
+	if(!w) return;
+	w->wheelEvent(ev);
+}
+
+
+void
+XWindow::mkimage(ImageFile const &fn, QString name)
 {
 	const Image img(fn);
-	ximgs_.emplace_back(*this, img);
+	ximgs_.emplace_back(*this, img, name);
 }

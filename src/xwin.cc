@@ -14,7 +14,6 @@
 #include <QWheelEvent>
 
 
-
 XILImage::XILImage(XWindow &xw, Image const &img, QString name) : QWindow(&xw), Transformable(),
 							    wbox_(), canvas_(this), work_(), orig_(img.getFilename()),
 							    parent_(&xw), loc(0,0), track_(false), focused_(false),
@@ -31,11 +30,6 @@ XILImage::XILImage(XWindow &xw, Image const &img, QString name) : QWindow(&xw), 
 }
 
 
-XILImage::~XILImage()
-{
-}
-
-
 void
 XILImage::workCopy()
 {
@@ -45,14 +39,11 @@ XILImage::workCopy()
 
 
 void
-XILImage::render(QRect reg)
+XILImage::render()
 {
 	if(!isExposed())
 		return;
-	if(reg.isNull())
-		reg = wbox_;
-	else if(!wbox_.intersects(reg))
-		return;
+	QRect reg{0, 0, width(), height()};
 	canvas_.beginPaint(reg);
 	QPaintDevice *pd = canvas_.paintDevice();
 	if(!pd) {
@@ -60,30 +51,38 @@ XILImage::render(QRect reg)
 		canvas_.endPaint();
 		return;
 	}
-	// To call, we need an old fashioned C pointer
 	QPainter p(pd);
-	p.drawPixmap(wbox_.x(), wbox_.y(), work_);
+	p.drawPixmap(0, 0, work_);
 	p.end();
 	canvas_.endPaint();				// also frees pd
-	canvas_.flush(wbox_, this);
+	canvas_.flush(reg, this);
 }
 
 
 void
-XILImage::resize(bool resize_window)
+XILImage::resize(QPoint const &, bool resize_window)
 {
-	workCopy();			// resets work copy and wbox
+	workCopy();			// reset work copy
+	// Resize around focus point, or centre?
+//	QPoint focus{ c.isNull() ? work_.rect().center() : c };
+	QPoint focus{ work_.rect().center() };
+
 	// Target size
 	QSize size{ wbox_.size() };
+	qWarning("Zoom %s z=%8f reswin=%s", qPrintable(name_), zoom_, resize_window ? "true" : "false");
 	size.setHeight( size.height() * zoom_ + 0.99f );
 	size.setWidth( size.width() * zoom_ + 0.99f );
-	work_.scaled(wbox_.size(), Qt::KeepAspectRatio);
+	QRect oldbox = wbox_;
+	qWarning("New size (%d,%d)",size.width(),size.height());
+	work_ = work_.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	qWarning("Scaled to (%d,%d)",work_.size().width(),work_.size().height());
 	wbox_.setSize( work_.size() );
+	wbox_.moveCenter(focus);
 	if( resize_window ) {
 		QWindow::resize(wbox_.size());
 		canvas_.resize(wbox_.size());
 	}
-	render(wbox_);
+	mkexpose( oldbox | wbox_ );
 }
 
 
@@ -96,21 +95,34 @@ XILImage::apply(transform const &)
 void
 XILImage::mousePressEvent(QMouseEvent *ev)
 {
+    QRect nullbox;
+	// qWarning("XIL press %s %d", qPrintable(name_), ev->button());
 	switch(ev->button()) {
 	case Qt::LeftButton:
 	// locX = ev.xbutton.x_root - wbox_.x; locY = ev.xbutton.y_root - wbox_.y;
-	    loc = ev->globalPos() - wbox_.topLeft();
+		// Position is relative to the parent window, or the root if we have no parent
+		loc = ev->globalPos();
+		oldq_ = loc;
+		loc -= wbox_.topLeft();
+		if(QWindow *p = this->parent()) {
+			loc -= p->position();
+		}
+		// Now find position relative to the top left corner
+		loc -= wbox_.topLeft();
 		track_ = true;
 	    break;
 	case Qt::MiddleButton:
 		zoom_ = 1.0f;
-		resize(resize_on_zoom_);
+		resize(ev->globalPos(), resize_on_zoom_);
 		break;
 	case Qt::RightButton:
+	    // redraw everything
+	    dynamic_cast<XWindow *>(this->parent())->redraw(nullbox);
 		break;
 	default:
 		break;
 	}
+	QWindow::mousePressEvent(ev);
 }
 
 
@@ -123,6 +135,7 @@ XILImage::mouseReleaseEvent(QMouseEvent *ev)
 	default:
 		break;
 	}
+	QWindow::mouseReleaseEvent(ev);
 }
 
 
@@ -131,35 +144,81 @@ XILImage::mouseMoveEvent(QMouseEvent *ev)
 {
 	// moveto(ev.xmotion.x_root - locX, ev.xmotion.y_root - locY);
 	// Only move if we are in track mode and docked with the main window
-	if(track_ && !isTopLevel()) {
-		auto q = ev->globalPos() - loc;
-		setPosition(q);
-		wbox_.setTopLeft(q);
+	if(track_) {
+		xwParentBox from = parent_box();
+		QPoint q{ev->globalPos()};
+		QPoint delta{ q-oldq_ };
+		oldq_ = q;
+		QPoint newpos{ this->position() + delta };
+		xwParentBox to{ newpos, from.size() };
+		wbox_ = to;
+		if(isTopLevel()) {
+			// XXX untested
+			setPosition(newpos);
+		} else {
+			// Current mouse position relative to parent window
+			q -= this->parent()->position();
+		}
+		// Move the window to the new location
+		setPosition(newpos);
+		mkexpose( from | to );
 	}
+	QWindow::mouseMoveEvent(ev);
 }
 
 
 void
 XILImage::wheelEvent(QWheelEvent *ev)
 {
-	if(focused_) {
-		if(ev->angleDelta().y() > 0)
-			zoom_ /= 1.1;
-		else
-			zoom_ *= 1.1;
-		resize(resize_on_zoom_);
-	}
+	// Area affected
+	xwParentBox area = parent_box();
+
+	// Wheel forward is zoom in (ie enlarge)
+	if(ev->angleDelta().y() > 0)
+		zoom_ *= 1.1;
+	else
+	// Wheel back is zoom out (ie shrink)
+		zoom_ /= 1.1;
+	resize(ev->globalPos(), resize_on_zoom_);
+
+	xwParentBox new_area = parent_box();
+	mkexpose( area | new_area );
+	QWindow::wheelEvent(ev);
 }
 
 
 void
 XILImage::exposeEvent(QExposeEvent *ev)
 {
-	render(ev->region().boundingRect());
+	//render(ev->region().boundingRect());
+	//render();
+	xwParentBox bbox = ev->region().boundingRect();
+	mkexpose(bbox);
+	QWindow::exposeEvent(ev);
 }
 
 
-XWindow::XWindow() : QWindow(static_cast<QWindow *>(nullptr))
+void
+XILImage::mkexpose(xwParentBox const &area)
+{
+	QWindow *parent = this->parent();
+	if(parent != nullptr) {
+		// XXX can't fail
+		dynamic_cast<XWindow *>(parent)->redraw(area);
+	}
+}
+
+
+XILImage::xwParentBox
+XILImage::parent_box() const
+{
+	QSize sz(width(), height());
+	xwParentBox bbox( geometry().topLeft(), sz);
+	return bbox;
+}
+
+
+XWindow::XWindow() : QWindow(static_cast<QWindow *>(nullptr)), qbs_(this)
 {
 	//showMaximized();
 }
@@ -175,7 +234,7 @@ XWindow::img_at(auto args...) noexcept
 {
 	// We must find the last (highest in stack) image that contains the point
 	std::reverse_iterator<std::list<XILImage>::iterator> p = ximgs_.rbegin(), q = ximgs_.rend();
-	// Annoyingly, std::find_if refuses to work with reverse iterators
+	// Annoyingly, std::find_if refuses to work with reverse iterator adaptors?
 	while( p != q ) {
 		if( p->contains(args) ) return &(*p);
 		++p;
@@ -185,11 +244,44 @@ XWindow::img_at(auto args...) noexcept
 
 
 void
+XWindow::redraw(QRect area)
+{
+	QRect window(0, 0, width(), height());
+	if(area.isNull())
+		area = window;
+	else
+		area &= window;
+	qbs_.beginPaint(area);
+	QPaintDevice *dev = qbs_.paintDevice();
+	if(dev) {
+		QPainter qp(dev);
+		qp.fillRect(area, QColor(0,0,0));
+		qp.end();
+		for( XILImage &x : ximgs_ )
+			if(x.intersects(area))
+				x.render();
+	}
+	qbs_.endPaint();
+	qbs_.flush(area, this);
+}
+
+
+void
 XWindow::exposeEvent(QExposeEvent *ev)
 {
+	if(!isExposed())
+		return;
 	QRect bbox(ev->region().boundingRect());
-	for( XILImage &x : ximgs_ )
-		x.render(QRect());
+	redraw(bbox);
+	QWindow::exposeEvent(ev);
+}
+
+
+void
+XWindow::resizeEvent(QResizeEvent *ev)
+{
+	qbs_.resize(ev->size());
+	QWindow::resizeEvent(ev);
 }
 
 
@@ -199,6 +291,7 @@ XWindow::mousePressEvent(QMouseEvent *ev)
 	XILImage *w = img_at(ev->globalPos());
 	if(!w) return;
 	w->mousePressEvent(ev);
+	QWindow::mousePressEvent(ev);
 }
 
 
@@ -208,6 +301,7 @@ XWindow::mouseReleaseEvent(QMouseEvent *ev)
 	XILImage *w = img_at(ev->globalPos());
 	if(!w) return;
 	w->mouseReleaseEvent(ev);
+	QWindow::mouseReleaseEvent(ev);
 }
 
 
@@ -217,6 +311,7 @@ XWindow::mouseMoveEvent(QMouseEvent *ev)
 	XILImage *w = img_at(ev->globalPos());
 	if(!w) return;
 	w->mouseMoveEvent(ev);
+	QWindow::mouseMoveEvent(ev);
 }
 
 
@@ -226,6 +321,7 @@ XWindow::wheelEvent(QWheelEvent *ev)
 	XILImage *w = img_at(ev->globalPos());
 	if(!w) return;
 	w->wheelEvent(ev);
+	QWindow::wheelEvent(ev);
 }
 
 

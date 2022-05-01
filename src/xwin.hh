@@ -30,9 +30,13 @@ class ImageFile;		// defined in image.hh
 
 
 class XILImage final : public QWindow, public Transformable {
+public:
+	/** Alias for XILImage's box in parent's coordinates */
+	typedef QRect xwParentBox;
+
  private:
-	/** placement on window; width and height equivalent to the original image size times scale */
-	QRect wbox_;
+	/** placement on main window; width and height equivalent to the original image size times scale */
+	xwParentBox wbox_;
 
 	QBackingStore canvas_;
 	/** keep the original image and a working copy */
@@ -41,11 +45,13 @@ class XILImage final : public QWindow, public Transformable {
 	/** Parent window */
 	QWindow *parent_;
 
-	/** Base coordinates for tracking movement, relative to root window */
+	/** Offset into the child window for dragging */
 	QPoint loc;
 
 	/** Whether this window is being moved, need to track movement */
 	bool track_;
+	/** Previous point for tracking, used by mouseMoveEvent */
+	QPoint oldq_;
 	/** Whether this window is focused */
 	bool focused_;
 	/** Whether to resize on zoom */
@@ -59,27 +65,36 @@ class XILImage final : public QWindow, public Transformable {
 	/** (Re)copy orig to working copy */
 	void workCopy();
 
-	/** Render the image in the window */
-	void render(QRect);
+	/** Create an expose event for the parent window */
+	void mkexpose(xwParentBox const &);
 
+	/** Bounding box in parent's coordinates */
+	xwParentBox parent_box() const;
+
+	/** Render the image in the window */
+	void render();
+
+#if 0
 	/** Move window */
 	void moveto(int x, int y) noexcept
 	{
 		wbox_.setX(x); wbox_.setY(y);
 		setPosition(x, y);
 	}
+#endif
 
 	/** Resize window and image to size relative to original image
+	 *  \param point (absolute) to resize over or null if use centre
 	 *  \param bool whether to resize the window or just the work copy.
 	*/
-	void resize(bool);
+	void resize(QPoint const &, bool);
 
 	/** Entry point for being visited by a transform */
 	void apply(transform const &) override;
 
 public:
 	XILImage(XWindow &, Image const &, QString);
-	~XILImage() noexcept;
+	~XILImage() = default;
 	XILImage(XILImage const &) = delete;
 	XILImage(XILImage &&) = default;
 	XILImage &operator=(XILImage const &) = delete;
@@ -90,7 +105,7 @@ public:
 	bool contains(int x, int y) const noexcept { return wbox_.contains(x,y); }
 	bool contains(QPoint p) const noexcept { return wbox_.contains(p); }
 	/** Does this image intersect a given box? */
-	bool intersects(QRect const &b) const noexcept { return wbox_.intersects(b); }
+	bool intersects(xwParentBox const &b) const noexcept { return wbox_.intersects(b); }
 	
 	/** Events, as defined by QWindow */
 	/*
@@ -117,6 +132,8 @@ class XWindow final : public QWindow {
 	std::list<XILImage> ximgs_;
 	/** Return a ptr to image at x,y or nullptr if there isn't one */
 	XILImage *img_at(auto args...) noexcept;
+	/** Background */
+	QBackingStore qbs_;
  public:
 	XWindow();
 	~XWindow() noexcept;
@@ -128,11 +145,15 @@ class XWindow final : public QWindow {
 	/** Make an image in this window */
 	void mkimage(ImageFile const &, QString);
 	/** Events may be received by the main window, in which case the event needs dispatching to the child window */
+	void resizeEvent(QResizeEvent *) override;
 	void mousePressEvent(QMouseEvent *) override;
 	void mouseReleaseEvent(QMouseEvent *) override;
 	void mouseMoveEvent(QMouseEvent *) override;
 	void wheelEvent(QWheelEvent *) override;
 	void exposeEvent(QExposeEvent *) override;
+
+	/** Redraw the whole window */
+	void redraw(QRect);
 
 	/** handle expose */
 	void expose(QRect const &);

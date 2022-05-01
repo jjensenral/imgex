@@ -1,7 +1,17 @@
 {
     "files.associations": {
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "array": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "utility": "cpp",
+        "*.tcc": "cpp",
+        "deque": "cpp",
+        "list": "cpp",
+        "string": "cpp",
+        "vector": "cpp"
     },
     "C_Cpp.intelliSenseEngineFallback": "Enabled",
-    "C_Cpp.loggingLevel": "Warning"
+    "C_Cpp.loggingLevel": "Warning",
+    "cmake.configureOnOpen": false
 }

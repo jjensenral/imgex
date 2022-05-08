@@ -13,6 +13,7 @@ find_package(Qt5 COMPONENTS Gui REQUIRED)
 add_executable(imgex
   src/main.cc
   src/image.cc
+  src/decor.cc
   src/session.cc
   src/transform.cc
   src/xwin.cc

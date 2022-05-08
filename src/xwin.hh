@@ -9,6 +9,7 @@
 
 #include <QPaintDeviceWindow>
 #include <QBackingStore>
+#include <QPainter>
 #include <QWindow>
 #include <QRect>
 
@@ -27,6 +28,14 @@ class ImageFile;		// defined in image.hh
 #include <QGuiApplication>
 
 
+/** Decorator for XILImage class */
+
+class XILDecorator {
+public:
+	/** Render to a painter but don't flush */
+	virtual void render(QPainter &) const = 0;
+	virtual ~XILDecorator() {}
+};
 
 
 class XILImage final : public QWindow, public Transformable {
@@ -71,6 +80,9 @@ public:
 	/** Bounding box in parent's coordinates */
 	xwParentBox parent_box() const;
 
+	/** Storage for decorators (overlays) */
+	std::vector<XILDecorator *> decors_;
+
 	/** Render the image in the window */
 	void render();
 
@@ -107,6 +119,9 @@ public:
 	/** Does this image intersect a given box? */
 	bool intersects(xwParentBox const &b) const noexcept { return wbox_.intersects(b); }
 	
+	/** Bounding box in own coordinates */
+	QRect box() const noexcept { return QRect(0, 0, wbox_.width(), wbox_.height()); }
+
 	/** Events, as defined by QWindow */
 	/*
 	void focusInEvent(QFocusEvent *) override { qWarning("  Focus %s", qPrintable(name_)); focused_ = true; };
@@ -117,6 +132,8 @@ public:
 	void mouseMoveEvent(QMouseEvent *) override;
 	void wheelEvent(QWheelEvent *) override;
 	void exposeEvent(QExposeEvent *) override;
+
+	void add_decorator(XILDecorator *dec) { decors_.push_back(dec); }
 
 	friend class XWindow;
 };

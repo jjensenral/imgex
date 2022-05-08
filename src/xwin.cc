@@ -1,5 +1,6 @@
 #include "xwin.hh"
 #include "image.hh"
+#include "decor.hh"
 #include <iterator>
 #include <exception>
 #include <algorithm>
@@ -53,6 +54,10 @@ XILImage::render()
 	}
 	QPainter p(pd);
 	p.drawPixmap(0, 0, work_);
+	// shared painter properties for (presumably) all decorators
+	p.setBrush(Qt::NoBrush);
+	p.setBackgroundMode(Qt::TransparentMode);
+	std::for_each(decors_.cbegin(), decors_.cend(), [&p](XILDecorator const *dr) { dr->render(p); });
 	p.end();
 	canvas_.endPaint();				// also frees pd
 	canvas_.flush(reg, this);

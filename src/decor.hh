@@ -13,13 +13,12 @@
 
 class BorderDecorator : public XILDecorator {
 private:
-	XILImage const *owner_;
 	QRect box_;
 	QColor col_;
 public:
 	/** Create in local coordinates
 	 * If created with a null box, will use its owner's border */
-	BorderDecorator(XILImage const *owner, QRect qr, QColor qc): owner_(owner), box_(qr), col_(qc) {}
+	BorderDecorator(QRect qr, QColor qc) : box_(qr), col_(qc) {}
 	virtual void render(QPainter &) const override;
 };
 

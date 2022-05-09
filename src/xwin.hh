@@ -30,11 +30,20 @@ class ImageFile;		// defined in image.hh
 
 /** Decorator for XILImage class */
 
+class XILImage;
+
 class XILDecorator {
+protected:
+	XILImage const *owner_;
 public:
+	/* owner is set by XILImage::add_decorator */
+	XILDecorator() : owner_(nullptr) {}
 	/** Render to a painter but don't flush */
 	virtual void render(QPainter &) const = 0;
-	virtual ~XILDecorator() {}
+	virtual ~XILDecorator() = default;
+
+	/* Give XILImage permission to add owner */
+	friend class XILImage;
 };
 
 
@@ -133,7 +142,11 @@ public:
 	void wheelEvent(QWheelEvent *) override;
 	void exposeEvent(QExposeEvent *) override;
 
-	void add_decorator(XILDecorator *dec) { decors_.push_back(dec); }
+	void add_decorator(XILDecorator *dec)
+	{
+		dec->owner_ = this;
+		decors_.push_back(dec);
+	}
 
 	friend class XWindow;
 };
@@ -148,6 +161,7 @@ class XWindow final : public QWindow {
 	/** List of images, lowest first */
 	std::list<XILImage> ximgs_;
 	/** Return a ptr to image at x,y or nullptr if there isn't one */
+	// TODO should be const
 	XILImage *img_at(auto args...) noexcept;
 	/** Background */
 	QBackingStore qbs_;

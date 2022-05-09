@@ -2,7 +2,7 @@
 
 ## NAME
 
-  imgex - persist your collages of photos organised into windows
+  imgex - persist your collages of photos organised into (background) windows
 
 ## STATUS
 
@@ -18,16 +18,15 @@ This application, originally designed for the [X Window System](www.x.org) but n
 
 ## IMPLEMENTATION
 
-The software is licensed under the MIT license.
+The software is licensed under the GNU GPL in order to be compatible with the LGPL-3 licensed Qt.
 
 It is written in C++ - requiring C++20 - and depends only on [Qt](https://www.qt.io/).
 
-## Why X
-
-and why not a toolkit, particularly a cross platform one?  The intention was to have a simple way of constructing images which could even be placed in
-the root window, as a background (provided the window manager doesn't clobber it).
-
 ## VERSIONS
+
+### 0.02
+
+
 
 ### 0.01
 

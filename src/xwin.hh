@@ -35,12 +35,21 @@ class XILImage;
 class XILDecorator {
 protected:
 	XILImage const *owner_;
-public:
-	/* owner is set by XILImage::add_decorator */
+
+	/* owner is set by XILImage::add_decorator
+	* It is protected to prevent people creating decorates outside
+	* of XILImage::add_decorator */
 	XILDecorator() : owner_(nullptr) {}
+public:
 	/** Render to a painter but don't flush */
 	virtual void render(QPainter &) const = 0;
 	virtual ~XILDecorator() = default;
+
+	/** Decorator event handler can pass status back to XILImage */
+	enum class event_status_t { EV_DONE, EV_NOP, EV_DELME };
+
+	/** Handle (or not) event */
+	virtual event_status_t handleEvent(QEvent const &) { return event_status_t::EV_NOP; }
 
 	/* Give XILImage permission to add owner */
 	friend class XILImage;
@@ -90,10 +99,14 @@ public:
 	xwParentBox parent_box() const;
 
 	/** Storage for decorators (overlays) */
-	std::vector<XILDecorator *> decors_;
+	std::list<XILDecorator *> decors_;
 
 	/** Render the image in the window */
 	void render();
+
+	/** Optionally pass (mouse) event to Decorator
+	 * \return true if event handled */
+	bool decor_event(QEvent const &);
 
 #if 0
 	/** Move window */
@@ -160,8 +173,10 @@ public:
 class XWindow final : public QWindow {
 	/** List of images, lowest first */
 	std::list<XILImage> ximgs_;
-	/** Return a ptr to image at x,y or nullptr if there isn't one */
-	// TODO should be const
+	/** Return a ptr to image at x,y or nullptr if there isn't one
+	 * Note this can't be const because it returns a pointer to a
+	 * non-const XILImage
+	 */
 	XILImage *img_at(auto args...) noexcept;
 	/** Background */
 	QBackingStore qbs_;

@@ -74,13 +74,10 @@ XILImage::resize(QPoint const &, bool resize_window)
 
 	// Target size
 	QSize size{ wbox_.size() };
-	qWarning("Zoom %s z=%8f reswin=%s", qPrintable(name_), zoom_, resize_window ? "true" : "false");
 	size.setHeight( size.height() * zoom_ + 0.99f );
 	size.setWidth( size.width() * zoom_ + 0.99f );
 	QRect oldbox = wbox_;
-	qWarning("New size (%d,%d)",size.width(),size.height());
 	work_ = work_.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-	qWarning("Scaled to (%d,%d)",work_.size().width(),work_.size().height());
 	wbox_.setSize( work_.size() );
 	wbox_.moveCenter(focus);
 	if( resize_window ) {
@@ -184,7 +181,8 @@ XILImage::wheelEvent(QWheelEvent *ev)
 	else
 	// Wheel back is zoom out (ie shrink)
 		zoom_ /= 1.1;
-	resize(ev->globalPos(), resize_on_zoom_);
+	// ev->globalPos() is deprecated
+	resize(ev->globalPosition().toPoint(), resize_on_zoom_);
 
 	xwParentBox new_area = parent_box();
 	mkexpose( area | new_area );
@@ -323,7 +321,7 @@ XWindow::mouseMoveEvent(QMouseEvent *ev)
 void
 XWindow::wheelEvent(QWheelEvent *ev)
 {
-	XILImage *w = img_at(ev->globalPos());
+	XILImage *w = img_at(ev->globalPosition().toPoint());
 	if(!w) return;
 	w->wheelEvent(ev);
 	QWindow::wheelEvent(ev);

@@ -10,6 +10,24 @@
 #include <QColor>
 #include "xwin.hh"
 
+/** Virtual class for decorators capturing mouse events */
+
+class XILEventDecorator : public XILDecorator {
+private:
+    bool track_;
+    QPoint oldq_;
+protected:
+    QPoint loc;
+    virtual void mPress(QMouseEvent const &);
+    virtual void mRelease(QMouseEvent const &);
+    virtual void mMove(QMouseEvent const &);
+public:
+    virtual event_status_t handleEvent(QEvent &) override;
+};
+
+
+
+/** Simple decorator which draws a border around the image */
 
 class BorderDecorator : public XILDecorator {
 private:

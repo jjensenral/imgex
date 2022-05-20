@@ -46,10 +46,14 @@ public:
 	virtual ~XILDecorator() = default;
 
 	/** Decorator event handler can pass status back to XILImage */
-	enum class event_status_t { EV_DONE, EV_NOP, EV_DELME };
+    enum class event_status_t { EV_DONE, EV_NOP, EV_DELME, EV_REDRAW };
 
 	/** Handle (or not) event */
-	virtual event_status_t handleEvent(QEvent const &) { return event_status_t::EV_NOP; }
+	virtual event_status_t handleEvent(QEvent &ev)
+	{
+		ev.setAccepted(false);
+		return event_status_t::EV_NOP;
+	}
 
 	/* Give XILImage permission to add owner */
 	friend class XILImage;
@@ -106,7 +110,7 @@ public:
 
 	/** Optionally pass (mouse) event to Decorator
 	 * \return true if event handled */
-	bool decor_event(QEvent const &);
+	bool decor_event(QEvent &);
 
 #if 0
 	/** Move window */

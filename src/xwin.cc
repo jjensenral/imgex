@@ -212,6 +212,29 @@ XILImage::mkexpose(xwParentBox const &area)
 }
 
 
+bool
+XILImage::decor_event(QEvent &qev)
+{
+	// Ask decorators if they want the event with most recent first
+	std::reverse_iterator<std::list<XILDecorator *>::iterator> p = decors_.rbegin(), q = decors_.rend();
+	while(p != q) {
+		switch((*p)->handleEvent(qev)) {
+		case XILDecorator::event_status_t::EV_DELME:
+			// Delete decorator and return
+		case XILDecorator::event_status_t::EV_DONE:
+			// Event handled
+			return true;
+		case XILDecorator::event_status_t::EV_NOP:
+			break;
+		case XILDecorator::event_status_t::EV_REDRAW:
+			render();
+			return true;
+		}
+	}
+	return false;
+}
+
+
 XILImage::xwParentBox
 XILImage::parent_box() const
 {
@@ -333,4 +356,7 @@ XWindow::mkimage(ImageFile const &fn, QString name)
 {
 	const Image img(fn);
 	ximgs_.emplace_back(*this, img, name);
+	// test to add decorator to one image
+	if(ximgs_.size() == 2)
+	    ximgs_.back().add_decorator(new BorderDecorator(QRect(), Qt::red));
 }

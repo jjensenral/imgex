@@ -13,19 +13,22 @@
 #include <QSize>
 #include <QMouseEvent>
 #include <QWheelEvent>
+#include <iostream>
 
 
-XILImage::XILImage(XWindow &xw, Image const &img, QString name) : QWindow(&xw), Transformable(),
-							    wbox_(), canvas_(this), work_(), orig_(img.getFilename()),
-							    parent_(&xw), loc(0,0), track_(false), focused_(false),
-								resize_on_zoom_(true),
-							    zoom_(1.0f), name_(name)
+XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name) : QWindow(&xw), Transformable(),
+                                                                         img_(std::move(img)),
+                                                                         // Note we take ownership of the Image and img is invalid from now on
+                                                                         wbox_(), canvas_(this), work_(), orig_(img_->getFilename()),
+                                                                         parent_(&xw), loc(0,0), track_(false), focused_(false),
+                                                                         resize_on_zoom_(true),
+                                                                         zoom_(1.0f), name_(name)
 {
-	// TODO: Apply any processing to orig_
+	// TODO: Apply any processing to orig
 	wbox_ = orig_.rect();
 	setGeometry(orig_.rect());
 	canvas_.resize(orig_.size());
-	// workCopy (re)sets wbox and sets img_
+	// workCopy (re)sets wbox
 	workCopy();
 	show();
 }
@@ -57,7 +60,7 @@ XILImage::render()
 	// shared painter properties for (presumably) all decorators
 	p.setBrush(Qt::NoBrush);
 	p.setBackgroundMode(Qt::TransparentMode);
-	std::for_each(decors_.cbegin(), decors_.cend(), [&p](XILDecorator const *dr) { dr->render(p); });
+	std::for_each(decors_.begin(), decors_.end(), [&p](XILDecorator *dr) { dr->render(p); });
 	p.end();
 	canvas_.endPaint();				// also frees pd
 	canvas_.flush(reg, this);
@@ -118,8 +121,16 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 		resize(ev->globalPos(), resize_on_zoom_);
 		break;
 	case Qt::RightButton:
-	    // redraw everything
-	    dynamic_cast<XWindow *>(this->parent())->redraw(nullbox);
+        // for now, just start or end the crop process
+        if(transforming()) {
+            QString qs{img_->getFilename()};
+            std::cerr << qs.toStdString() << '\n';
+            img_->add_transform(end_transform());
+//            add_decorator()
+        } else {
+            begin_transform(transform::transform_id::TX_CROP);
+        }
+        mkexpose(wbox_);
 		break;
 	default:
 		break;
@@ -181,9 +192,12 @@ XILImage::wheelEvent(QWheelEvent *ev)
 	else
 	// Wheel back is zoom out (ie shrink)
 		zoom_ /= 1.1;
-	// ev->globalPos() is deprecated
-	resize(ev->globalPosition().toPoint(), resize_on_zoom_);
-
+	// ev->globalPos() is deprecated in 5.15 at least
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    resize(ev->globalPosition().toPoint(), resize_on_zoom_);
+#else
+    resize(ev->globalPos(), resize_on_zoom_);
+#endif
 	xwParentBox new_area = parent_box();
 	mkexpose( area | new_area );
 	QWindow::wheelEvent(ev);
@@ -344,7 +358,12 @@ XWindow::mouseMoveEvent(QMouseEvent *ev)
 void
 XWindow::wheelEvent(QWheelEvent *ev)
 {
-	XILImage *w = img_at(ev->globalPosition().toPoint());
+	XILImage *w =
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+            img_at(ev->globalPosition().toPoint());
+#else
+            img_at(ev->globalPos());
+#endif
 	if(!w) return;
 	w->wheelEvent(ev);
 	QWindow::wheelEvent(ev);
@@ -354,8 +373,8 @@ XWindow::wheelEvent(QWheelEvent *ev)
 void
 XWindow::mkimage(ImageFile const &fn, QString name)
 {
-	const Image img(fn);
-	ximgs_.emplace_back(*this, img, name);
+    auto img = std::make_unique<Image>(fn);
+	ximgs_.emplace_back(*this, std::move(img), name);
 	// test to add decorator to one image
 	if(ximgs_.size() == 2)
 	    ximgs_.back().add_decorator(new BorderDecorator(QRect(), Qt::red));

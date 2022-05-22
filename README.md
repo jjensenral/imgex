@@ -14,7 +14,7 @@ This is an early version which merely has the core functionality - open and perf
 
 Build collages of images for, say, your desktop background.
 
-This application, originally designed for the [X Window System](www.x.org) but now using Qt (Qt 5 currently), opens a screen-sized window.  The idea is to load image files from a given location - designed to support removable media, like a camera's memory card - and let the user arrange selected images into collages.  These can then be persisted, so they can be rebuilt later.  By default, only the steps taken to create the image are recorded; the image itself is not saved.  These steps can then be replayed later, assuming the original images remain available.
+This application, originally designed for the [X Window System](https://www.x.org) but now using Qt (Qt 5 currently), opens a screen-sized window.  The idea is to load image files from a given location - designed to support removable media, like a camera's memory card - and let the user arrange selected images into collages.  These can then be persisted, so they can be rebuilt later.  By default, only the steps taken to create the image are recorded; the image itself is not saved.  These steps can then be replayed later, assuming the original images remain available.
 
 ## IMPLEMENTATION
 

@@ -4,10 +4,11 @@
 #include "decor.hh"
 #include <iostream>		// debug
 #include <QMouseEvent>
+#include <QPainter>
 
 
 XILDecorator::event_status_t
-XILEventDecorator::handleEvent(QEvent &qev)
+XILMouseEventDecorator::handleEvent(QEvent &qev)
 {
 	switch(qev.type()) {
 	case QEvent::MouseButtonPress:
@@ -28,7 +29,7 @@ XILEventDecorator::handleEvent(QEvent &qev)
 
 
 void
-XILEventDecorator::mPress(QMouseEvent const &ev)
+XILMouseEventDecorator::mPress(QMouseEvent const &ev)
 {
 	switch(ev.button()) {
 	case Qt::LeftButton:
@@ -39,7 +40,7 @@ XILEventDecorator::mPress(QMouseEvent const &ev)
 
 
 void
-XILEventDecorator::mRelease(QMouseEvent const &ev)
+XILMouseEventDecorator::mRelease(QMouseEvent const &ev)
 {
 	switch(ev.button()) {
 	case Qt::LeftButton:
@@ -51,7 +52,7 @@ XILEventDecorator::mRelease(QMouseEvent const &ev)
 
 
 void
-XILEventDecorator::mMove(QMouseEvent const &ev)
+XILMouseEventDecorator::mMove(QMouseEvent const &ev)
 {
 	if(track_) {
 		loc = ev.pos();
@@ -59,9 +60,32 @@ XILEventDecorator::mMove(QMouseEvent const &ev)
 }
 
 
+XILDecorator::event_status_t
+XILCropDecorator::handleEvent(QEvent &qev) {
+    event_status_t ret = XILMouseEventDecorator::handleEvent(qev);
+    if(ret == event_status_t::EV_NOP) ret = event_status_t::EV_REDRAW;
+    return ret;
+}
+
 
 void
-BorderDecorator::render(QPainter &qp) const
+XILCropDecorator::render(QPainter &qp)
+{
+    if(crop_.isNull()) {
+        crop_ = owner_->box();
+        crop_.adjust(0, 0, -1, -1);
+    }
+    qp.save();
+    qp.setPen(Qt::SolidLine);
+    qp.setPen(Qt::white);
+    qp.setCompositionMode(QPainter::CompositionMode_Difference);
+    qp.drawRect(crop_);
+    qp.restore();
+}
+
+
+void
+BorderDecorator::render(QPainter &qp)
 {
 	// default is parent box
 	QRect box{box_.isNull() ? owner_->box() : box_};

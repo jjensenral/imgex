@@ -16,6 +16,7 @@
 
 #include "common.hh"
 #include "session.hh"
+#include "image.hh"
 
 
 class XWindow;
@@ -42,7 +43,7 @@ protected:
 	XILDecorator() : owner_(nullptr) {}
 public:
 	/** Render to a painter but don't flush */
-	virtual void render(QPainter &) const = 0;
+	virtual void render(QPainter &) = 0;
 	virtual ~XILDecorator() = default;
 
 	/** Decorator event handler can pass status back to XILImage */
@@ -66,6 +67,8 @@ public:
 	typedef QRect xwParentBox;
 
  private:
+    /** Reference to the image which we need to update with transformations etc */
+    std::unique_ptr<Image> img_;
 	/** placement on main window; width and height equivalent to the original image size times scale */
 	xwParentBox wbox_;
 
@@ -100,7 +103,7 @@ public:
 	void mkexpose(xwParentBox const &);
 
 	/** Bounding box in parent's coordinates */
-	xwParentBox parent_box() const;
+	[[nodiscard]] xwParentBox parent_box() const;
 
 	/** Storage for decorators (overlays) */
 	std::list<XILDecorator *> decors_;
@@ -131,7 +134,7 @@ public:
 	void apply(transform const &) override;
 
 public:
-	XILImage(XWindow &, Image const &, QString);
+	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
 	~XILImage() = default;
 	XILImage(XILImage const &) = delete;
 	XILImage(XILImage &&) = default;

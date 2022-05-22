@@ -12,7 +12,7 @@
 
 /** Virtual class for decorators capturing mouse events */
 
-class XILEventDecorator : public XILDecorator {
+class XILMouseEventDecorator : public XILDecorator {
 private:
     bool track_;
     QPoint oldq_;
@@ -27,6 +27,16 @@ public:
 
 
 
+/** Crop decorator */
+class XILCropDecorator : public XILMouseEventDecorator {
+private:
+    QRect crop_;
+public:
+    virtual event_status_t handleEvent(QEvent &) override;
+
+    virtual void render(QPainter &qp) override;
+};
+
 /** Simple decorator which draws a border around the image */
 
 class BorderDecorator : public XILDecorator {
@@ -37,7 +47,7 @@ public:
 	/** Create in local coordinates
 	 * If created with a null box, will use its owner's border */
 	BorderDecorator(QRect qr, QColor qc) : box_(qr), col_(qc) {}
-	virtual void render(QPainter &) const override;
+	virtual void render(QPainter &) override;
 };
 
 

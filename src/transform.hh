@@ -19,28 +19,35 @@ public:
     tf_zoom() noexcept : transform(), zoom_(1.0f) {}
     tf_zoom(float z) noexcept : transform(), zoom_(z) {}
 
+    QRect apply(QRect bbox, QPixmap &img) const override;
 };
 
 
 /** Pan - change the offset of the top left corner */
-class tf_pan : public transform {
+class tf_move : public transform {
 private:
     int x_, y_;
 protected:
-    transform_id type() const noexcept override { return transform_id::TX_PAN; }
+    transform_id type() const noexcept override { return transform_id::TX_MOVE; }
 public:
-    tf_pan() noexcept : x_(0), y_(0) {}
-    tf_pan(int x, int y) noexcept : x_(x), y_(y) {}
+    tf_move() noexcept : x_(0), y_(0) {}
+    tf_move(int x, int y) noexcept : x_(x), y_(y) {}
+
+    QRect apply(QRect bbox, QPixmap &img) const override;
 };
+
 
 class tf_crop : public transform {
 private:
+    /** crop box relative to pixmap size */
     QRect box_;
 protected:
     transform_id type() const noexcept override { return transform_id::TX_CROP; }
 public:
     tf_crop() noexcept {}
     tf_crop(QRect const &qr) noexcept : box_(qr) {}
+
+    QRect apply(QRect bbox, QPixmap &img) const override;
 };
 
 #endif

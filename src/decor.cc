@@ -2,6 +2,7 @@
 
 
 #include "decor.hh"
+#include "transform.hh"
 #include <iostream>		// debug
 #include <QMouseEvent>
 #include <QPainter>
@@ -83,6 +84,14 @@ XILCropDecorator::render(QPainter &qp)
     qp.restore();
 }
 
+
+transform *
+XILCropDecorator::to_transform() const
+{
+    if(crop_.isNull())
+        return new transform();
+    return new tf_crop{crop_};
+}
 
 void
 BorderDecorator::render(QPainter &qp)

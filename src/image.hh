@@ -30,7 +30,7 @@ public:
 	image may be in multiple files and may have processes done to it
 	independently of its placement in a window. */
 
-class Image final : public Transformable {
+class Image final {
 	// TODO: checksum
 	ImageFile const imgf_;
     workflow wf_;
@@ -39,10 +39,8 @@ public:
 	~Image();
 	/** Returns a filename (basename) identifying the file */
 	QString getFilename() const noexcept;
-	/** Transformable visitor entry point for being visited by a transform */
-	void apply(transform const &) override;
-    /** Add a transform to the workflow for this image */
-    void add_transform(transform const &tf) {
+    /** Add a transform to the workflow for this image, taking ownership */
+    void add_transform(transform const *tf) {
         wf_.add(tf);
     }
 };

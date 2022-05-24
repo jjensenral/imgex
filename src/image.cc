@@ -61,13 +61,6 @@ Image::~Image() noexcept
 }
 
 
-/* Transformable implementation */
-void
-Image::apply(transform const &)
-{
-}
-
-
 QString
 Image::getFilename() const noexcept
 {

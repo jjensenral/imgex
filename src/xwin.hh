@@ -56,6 +56,10 @@ public:
 		return event_status_t::EV_NOP;
 	}
 
+    /** Some decorators present a transform visually.
+     * By default a NOP transform is returned. */
+    virtual transform *to_transform() const { return new transform(); }
+
 	/* Give XILImage permission to add owner */
 	friend class XILImage;
 };
@@ -129,9 +133,6 @@ public:
 	 *  \param bool whether to resize the window or just the work copy.
 	*/
 	void resize(QPoint const &, bool);
-
-	/** Entry point for being visited by a transform */
-	void apply(transform const &) override;
 
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);

@@ -92,12 +92,6 @@ XILImage::resize(QPoint const &, bool resize_window)
 
 
 void
-XILImage::apply(transform const &)
-{
-}
-
-
-void
 XILImage::mousePressEvent(QMouseEvent *ev)
 {
     QRect nullbox;
@@ -121,14 +115,15 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 		resize(ev->globalPos(), resize_on_zoom_);
 		break;
 	case Qt::RightButton:
-        // for now, just start or end the crop process
-        if(transforming()) {
-            QString qs{img_->getFilename()};
-            std::cerr << qs.toStdString() << '\n';
-            img_->add_transform(end_transform());
-//            add_decorator()
+        // XXX for now, just start or end the crop process
+        if(decors_.empty()) {
+            add_decorator(new XILCropDecorator());
         } else {
-            begin_transform(transform::transform_id::TX_CROP);
+            // XXX assume it is the crop decorator and finalise it
+            XILDecorator *dec = decors_.front();
+            Transformable::add_from_decorator(*dec);
+            decors_.pop_front();
+            delete dec;
         }
         mkexpose(wbox_);
 		break;

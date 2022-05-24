@@ -35,6 +35,8 @@ public:
     virtual event_status_t handleEvent(QEvent &) override;
 
     virtual void render(QPainter &qp) override;
+
+    virtual transform *to_transform() const override;
 };
 
 /** Simple decorator which draws a border around the image */

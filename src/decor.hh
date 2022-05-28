@@ -14,13 +14,13 @@
 
 class XILMouseEventDecorator : public XILDecorator {
 private:
-    bool track_;
     QPoint oldq_;
 protected:
-    QPoint loc;
-    virtual void mPress(QMouseEvent const &);
-    virtual void mRelease(QMouseEvent const &);
-    virtual void mMove(QMouseEvent const &);
+    bool track_;
+    QPoint delta;
+    virtual event_status_t mPress(QMouseEvent const &);
+    virtual event_status_t mRelease(QMouseEvent const &);
+    virtual event_status_t mMove(QMouseEvent const &);
 public:
     virtual event_status_t handleEvent(QEvent &) override;
 };
@@ -30,13 +30,20 @@ public:
 /** Crop decorator */
 class XILCropDecorator : public XILMouseEventDecorator {
 private:
+    /** Area to crop */
     QRect crop_;
+    /** Track which corner we are moving (if any) */
+    enum class corner_t { NONE, NW, NE, SW, SE } corner_;
 public:
     virtual event_status_t handleEvent(QEvent &) override;
 
     virtual void render(QPainter &qp) override;
 
     virtual transform *to_transform() const override;
+
+    event_status_t mPress(QMouseEvent const &) override;
+    event_status_t mMove(QMouseEvent const &) override;
+    event_status_t mRelease(QMouseEvent const &) override;
 };
 
 /** Simple decorator which draws a border around the image */

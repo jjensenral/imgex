@@ -9,55 +9,82 @@
 
 
 XILDecorator::event_status_t
-XILMouseEventDecorator::handleEvent(QEvent &qev)
+XILDecorator::event_status_or(event_status_t a, event_status_t b) noexcept
 {
-	switch(qev.type()) {
-	case QEvent::MouseButtonPress:
-		mPress(dynamic_cast<QMouseEvent&>(qev));
-		qev.accept();
-		break;
-	case QEvent::MouseButtonRelease:
-		mRelease(dynamic_cast<QMouseEvent&>(qev));
-		qev.accept();
-		break;
-	case QEvent::MouseMove:
-		mMove(dynamic_cast<QMouseEvent&>(qev));
-		qev.accept();
-		break;
-	}
+    // everything takes precedence over NOP
+    if(b == event_status_t::EV_NOP) return a;
+    if(a == event_status_t::EV_NOP) return b;
+    // DELME takes precedence over everything else
+    if(a == event_status_t::EV_DELME || b == event_status_t::EV_DELME)
+        return event_status_t::EV_DELME;
+    // REDRAW takes precedence over DONE
+    if(a == event_status_t::EV_REDRAW || b == event_status_t::EV_REDRAW)
+        return event_status_t::EV_REDRAW;
+    return event_status_t::EV_DONE;
 }
 
 
 
-void
+XILDecorator::event_status_t
+XILMouseEventDecorator::handleEvent(QEvent &qev)
+{
+    XILDecorator::event_status_t ret = event_status_t::EV_NOP;
+	switch(qev.type()) {
+	case QEvent::MouseButtonPress:
+		ret = mPress(dynamic_cast<QMouseEvent&>(qev));
+		qev.accept();
+		break;
+	case QEvent::MouseButtonRelease:
+		ret = mRelease(dynamic_cast<QMouseEvent&>(qev));
+		qev.accept();
+		break;
+	case QEvent::MouseMove:
+		ret = mMove(dynamic_cast<QMouseEvent&>(qev));
+		qev.accept();
+		break;
+	}
+    return ret;
+}
+
+
+
+XILDecorator::event_status_t
 XILMouseEventDecorator::mPress(QMouseEvent const &ev)
 {
 	switch(ev.button()) {
 	case Qt::LeftButton:
 		track_ = true;
-		break;
+        oldq_ = ev.pos();
+		return event_status_t::EV_DONE;
 	}
+    return event_status_t::EV_NOP;
 }
 
 
-void
+XILDecorator::event_status_t
 XILMouseEventDecorator::mRelease(QMouseEvent const &ev)
 {
 	switch(ev.button()) {
 	case Qt::LeftButton:
 		track_ = false;
-		break;
+		return event_status_t::EV_DONE;
 	}
+    return event_status_t::EV_NOP;
 }
 
 
 
-void
+XILDecorator::event_status_t
 XILMouseEventDecorator::mMove(QMouseEvent const &ev)
 {
 	if(track_) {
-		loc = ev.pos();
+		QPoint loc = ev.pos();
+        delta = loc-oldq_;
+        oldq_ = loc;
+        owner_->mkexpose();
+        return event_status_t::EV_DONE;
 	}
+    return event_status_t::EV_NOP;
 }
 
 
@@ -66,6 +93,63 @@ XILCropDecorator::handleEvent(QEvent &qev) {
     event_status_t ret = XILMouseEventDecorator::handleEvent(qev);
     if(ret == event_status_t::EV_NOP) ret = event_status_t::EV_REDRAW;
     return ret;
+}
+
+
+XILDecorator::event_status_t
+XILCropDecorator::mPress(const QMouseEvent &qev)
+{
+    event_status_t ret = event_status_t::EV_NOP;
+    if(qev.button() == Qt::LeftButton) {
+        // we move whichever corner is closest
+        bool top = (qev.y() << 1) < owner_->height();
+        if((qev.x() << 1) <= owner_->width())
+            corner_ = top ? corner_t::NW : corner_t::SW;
+        else
+            corner_ = top ? corner_t::NE : corner_t::SE;
+        ret = event_status_t::EV_REDRAW;
+    }
+     return event_status_or(ret, XILMouseEventDecorator::mPress(qev));
+}
+
+
+XILDecorator::event_status_t
+XILCropDecorator::mRelease(const QMouseEvent &qev)
+{
+    event_status_t ret = event_status_t::EV_NOP;
+    if(qev.button() == Qt::LeftButton) {
+        corner_ = corner_t::NONE;
+        ret = event_status_t::EV_DONE;
+    }
+    return event_status_or(ret, XILMouseEventDecorator::mRelease(qev));
+}
+
+
+XILDecorator::event_status_t
+XILCropDecorator::mMove(const QMouseEvent &qev)
+{
+    event_status_t ret = event_status_t::EV_NOP;
+    if(track_) {
+        XILMouseEventDecorator::mMove(qev);
+        QPoint p{qev.pos()};
+        switch(corner_) {
+            case corner_t::NW:
+                crop_.setTopLeft(p);
+                break;
+            case corner_t::NE:
+                crop_.setTopRight(p);
+                break;
+            case corner_t::SW:
+                crop_.setBottomLeft(p);
+                break;
+            case corner_t::SE:
+                crop_.setBottomRight(p);
+                break;
+            case corner_t::NONE: ;
+        }
+        ret = event_status_t::EV_REDRAW;
+    }
+    return event_status_or(ret, XILMouseEventDecorator::mMove(qev));
 }
 
 

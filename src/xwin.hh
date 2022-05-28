@@ -38,7 +38,7 @@ protected:
 	XILImage const *owner_;
 
 	/* owner is set by XILImage::add_decorator
-	* It is protected to prevent people creating decorates outside
+	* Constructor is protected to prevent people creating decorates outside
 	* of XILImage::add_decorator */
 	XILDecorator() : owner_(nullptr) {}
 public:
@@ -49,8 +49,12 @@ public:
 	/** Decorator event handler can pass status back to XILImage */
     enum class event_status_t { EV_DONE, EV_NOP, EV_DELME, EV_REDRAW };
 
+    /** General utility for combining event status */
+    // defined in decor.cc
+    static event_status_t event_status_or(event_status_t, event_status_t) noexcept;
+
 	/** Handle (or not) event */
-	virtual event_status_t handleEvent(QEvent &ev)
+	[[nodiscard]] virtual event_status_t handleEvent(QEvent &ev)
 	{
 		ev.setAccepted(false);
 		return event_status_t::EV_NOP;
@@ -103,9 +107,6 @@ public:
 	/** (Re)copy orig to working copy */
 	void workCopy();
 
-	/** Create an expose event for the parent window */
-	void mkexpose(xwParentBox const &);
-
 	/** Bounding box in parent's coordinates */
 	[[nodiscard]] xwParentBox parent_box() const;
 
@@ -152,7 +153,11 @@ public:
 	/** Bounding box in own coordinates */
 	QRect box() const noexcept { return QRect(0, 0, wbox_.width(), wbox_.height()); }
 
-	/** Events, as defined by QWindow */
+    /** Create an expose event for the parent window */
+    void mkexpose(xwParentBox const &) const;
+    void mkexpose() const { mkexpose(wbox_); }
+
+    /** Events, as defined by QWindow */
 	/*
 	void focusInEvent(QFocusEvent *) override { qWarning("  Focus %s", qPrintable(name_)); focused_ = true; };
 	void focusOutEvent(QFocusEvent *) override { qWarning("Unfocus %s", qPrintable(name_)); focused_ = false; };

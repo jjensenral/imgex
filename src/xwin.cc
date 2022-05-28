@@ -94,7 +94,8 @@ XILImage::resize(QPoint const &, bool resize_window)
 void
 XILImage::mousePressEvent(QMouseEvent *ev)
 {
-    QRect nullbox;
+    if(decor_event(*ev))
+        return;
 	// qWarning("XIL press %s %d", qPrintable(name_), ev->button());
 	switch(ev->button()) {
 	case Qt::LeftButton:
@@ -137,6 +138,8 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 void
 XILImage::mouseReleaseEvent(QMouseEvent *ev)
 {
+    if(decor_event(*ev))
+        return;
 	switch(ev->button()) {
 	case Qt::LeftButton:
 		track_ = false;
@@ -150,7 +153,8 @@ XILImage::mouseReleaseEvent(QMouseEvent *ev)
 void
 XILImage::mouseMoveEvent(QMouseEvent *ev)
 {
-	// moveto(ev.xmotion.x_root - locX, ev.xmotion.y_root - locY);
+    if(decor_event(*ev))
+        return;
 	// Only move if we are in track mode and docked with the main window
 	if(track_) {
 		xwParentBox from = parent_box();
@@ -211,7 +215,7 @@ XILImage::exposeEvent(QExposeEvent *ev)
 
 
 void
-XILImage::mkexpose(xwParentBox const &area)
+XILImage::mkexpose(xwParentBox const &area) const
 {
 	QWindow *parent = this->parent();
 	if(parent != nullptr) {
@@ -239,6 +243,7 @@ XILImage::decor_event(QEvent &qev)
 			render();
 			return true;
 		}
+        ++p;
 	}
 	return false;
 }

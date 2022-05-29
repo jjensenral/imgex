@@ -23,17 +23,25 @@ Transformable::add_from_decorator(const XILDecorator &dec)
 
 
 QRect
-Transformable::apply(QPixmap &img) const
+Transformable::apply(QPixmap &img)
 {
     QRect bbox{QPoint(0,0), img.size()};
     std::for_each(txfs_.cbegin(), txfs_.cend(),
-                  [&](transform const *tf){ bbox = tf->apply(bbox, img); });
+                  [&](transform const *tf){ bbox = tf->apply(*this, bbox, img); });
     return bbox;
 }
 
 
+transform *
+tf_zoom::clone() const
+{
+    tf_zoom *z = new tf_zoom();
+    z->zoom_ = zoom_;
+}
+
+
 QRect
-tf_zoom::apply(QRect bbox, QPixmap &img) const
+tf_zoom::apply(Transformable &owner, QRect bbox, QPixmap &img) const
 {
     QSize target{bbox.size()};
     target.setHeight(target.height() * zoom_ + 0.99f );
@@ -45,16 +53,27 @@ tf_zoom::apply(QRect bbox, QPixmap &img) const
 }
 
 
-QRect tf_move::apply(QRect bbox, QPixmap &img) const
+QRect tf_move::apply(Transformable &owner, QRect bbox, QPixmap &img) const
 {
-    // XXX: check whether the pan is possible
+    // XXX not implemented yet
     bbox.adjust(x_, y_, 0, 0);
-    return transform::apply(bbox, img);
+    return transform::apply(owner, bbox, img);
 }
 
 
-QRect tf_crop::apply(QRect bbox, QPixmap &img) const
+
+transform *
+tf_crop::clone() const
 {
-    // TODO
-    return transform::apply(bbox, img);
+    tf_crop *c = new tf_crop();
+    c->box_ = box_;
+    return c;
+}
+
+
+QRect tf_crop::apply(Transformable &owner, QRect bbox, QPixmap &img) const
+{
+    // shift owner to crop_.topLeft
+    // scroll pixmap by crop_.topLeft
+    // truncate pixmap to crop_.size
 }

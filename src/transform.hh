@@ -18,8 +18,9 @@ protected:
 public:
     tf_zoom() noexcept : transform(), zoom_(1.0f) {}
     tf_zoom(float z) noexcept : transform(), zoom_(z) {}
+    transform *clone() const override;
 
-    QRect apply(QRect bbox, QPixmap &img) const override;
+    QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
 };
 
 
@@ -32,22 +33,24 @@ protected:
 public:
     tf_move() noexcept : x_(0), y_(0) {}
     tf_move(int x, int y) noexcept : x_(x), y_(y) {}
+    transform *clone() const override;
 
-    QRect apply(QRect bbox, QPixmap &img) const override;
+    QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
 };
 
 
 class tf_crop : public transform {
 private:
-    /** crop box relative to pixmap size */
+    /** crop box relative in pixmap (local) coordinates */
     QRect box_;
 protected:
     transform_id type() const noexcept override { return transform_id::TX_CROP; }
 public:
     tf_crop() noexcept {}
     tf_crop(QRect const &qr) noexcept : box_(qr) {}
+    transform *clone() const override;
 
-    QRect apply(QRect bbox, QPixmap &img) const override;
+    QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
 };
 
 #endif

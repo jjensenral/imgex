@@ -121,6 +121,7 @@ XILImage::mousePressEvent(QMouseEvent *ev)
             add_decorator(new XILCropDecorator());
         } else {
             // XXX assume it is the crop decorator and finalise it
+            std::cerr << "RMB\n";
             XILDecorator *dec = decors_.front();
             Transformable::add_from_decorator(*dec);
             decors_.pop_front();

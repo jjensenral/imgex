@@ -91,7 +91,6 @@ XILMouseEventDecorator::mMove(QMouseEvent const &ev)
 XILDecorator::event_status_t
 XILCropDecorator::handleEvent(QEvent &qev) {
     event_status_t ret = XILMouseEventDecorator::handleEvent(qev);
-    if(ret == event_status_t::EV_NOP) ret = event_status_t::EV_REDRAW;
     return ret;
 }
 
@@ -101,9 +100,10 @@ XILCropDecorator::mPress(const QMouseEvent &qev)
 {
     event_status_t ret = event_status_t::EV_NOP;
     if(qev.button() == Qt::LeftButton) {
-        // we move whichever corner is closest
-        bool top = (qev.y() << 1) < owner_->height();
-        if((qev.x() << 1) <= owner_->width())
+        QPoint delta = qev.pos() - crop_.center();
+        // we move whichever corner is closest, relative to the current crop rectangle
+        bool top = delta.y() < 0;
+        if(delta.x() < 0)
             corner_ = top ? corner_t::NW : corner_t::SW;
         else
             corner_ = top ? corner_t::NE : corner_t::SE;
@@ -130,23 +130,23 @@ XILCropDecorator::mMove(const QMouseEvent &qev)
 {
     event_status_t ret = event_status_t::EV_NOP;
     if(track_) {
-        XILMouseEventDecorator::mMove(qev);
-        QPoint p{qev.pos()};
+        XILMouseEventDecorator::mMove(qev); // calculates delta
         switch(corner_) {
             case corner_t::NW:
-                crop_.setTopLeft(p);
+                crop_.setTopLeft(crop_.topLeft()+delta);
                 break;
             case corner_t::NE:
-                crop_.setTopRight(p);
+                crop_.setTopRight(crop_.topRight()+delta);
                 break;
             case corner_t::SW:
-                crop_.setBottomLeft(p);
+                crop_.setBottomLeft(crop_.bottomLeft()+delta);
                 break;
             case corner_t::SE:
-                crop_.setBottomRight(p);
+                crop_.setBottomRight(crop_.bottomRight()+delta);
                 break;
             case corner_t::NONE: ;
         }
+        crop_ = crop_.normalized();
         ret = event_status_t::EV_REDRAW;
     }
     return event_status_or(ret, XILMouseEventDecorator::mMove(qev));

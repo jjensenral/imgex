@@ -1,0 +1,10 @@
+TODO
+- Lots of functionality is missing
+  - Persistence and sessions
+  - File selection
+  - Switch image within a XILWindow
+- Zoom for XILWindow should be factored out as a transform
+- Move XILWindows from one XWindow to another (it can't just be moved with the mouse)
+
+BUGS
+- If zooming a window with an active crop, the crop does not change its size

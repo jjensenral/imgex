@@ -22,6 +22,7 @@ class transform {
 	transform() = default;
 	virtual ~transform() {}
     transform(transform const &) = default;
+    virtual transform *clone() const { return new transform(); }
     enum class transform_id { TX_NOP, TX_CROP, TX_ZOOM, TX_MOVE  };
 	/** Process a XILImage (defined in xwin.hh) or an Image (defined in image.hh)
 	 * The intention is that XILImage is transformed per-window and can differ for each window that the image appears in,
@@ -33,10 +34,15 @@ class transform {
      */
     [[nodiscard]] virtual bool image() const noexcept { return true; }
     /** Apply the transform to a box and an image, returning the updated box
+     * @param owner for transform to call back to modify other owner parameters
      * @param bbox Bounding box of image (can be smaller than image size)
      * @param img Image; will be updated in place
      */
-    virtual QRect apply(QRect bbox, QPixmap &img) const { /* do nothing */ return bbox; }
+    virtual QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const
+    {
+        /* NOP transform does nothing */
+        return bbox;
+    }
 protected:
 	/** An arbitrary identifier for each type */
 	[[nodiscard]] virtual transform_id type() const noexcept { return transform_id::TX_NOP; }
@@ -90,7 +96,7 @@ protected:
 	 * @param img Pixmap which will be modified in-place
 	 * @return new bounding box in parent window (screen) coordinates (aka wbox_)
 	 */
-    QRect apply(QPixmap &img) const;
+    QRect apply(QPixmap &img);
 	/** Serialise */
 	
 };

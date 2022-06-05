@@ -17,7 +17,7 @@ public:
     FileNotFound(QString const &s) : fn_(s) {}
     ~FileNotFound() {}
     const char * what() const noexcept override { return "File not found"; }
-    QString const &filename() noexcept { return fn_; }
+    QString const &filename() const noexcept { return fn_; }
 };
 
 /** Transformable defines (below) a type of image which can have transforms applied to it
@@ -32,6 +32,7 @@ class QPixmap;
 
 class transform {
  public:
+    /** Default transform is a NOP (No Operation) */
 	transform() = default;
 	virtual ~transform() {}
     transform(transform const &) = default;
@@ -48,8 +49,9 @@ class transform {
     [[nodiscard]] virtual bool image() const noexcept { return true; }
     /** Apply the transform to a box and an image, returning the updated box
      * @param owner for transform to call back to modify other owner parameters
-     * @param bbox Bounding box of image (can be smaller than image size)
+     * @param bbox Global coordinates of image
      * @param img Image; will be updated in place
+     * @return Updated global coordinates
      */
     virtual QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const
     {
@@ -98,21 +100,23 @@ class ImageFile;
 class Transformable {
 private:
     workflow txfs_;
+
 public:
-	Transformable(ImageFile const &fn);
+    /** Alias for XILImage's box in parent's coordinates */
+    typedef QRect xwParentBox;
+
+    Transformable(ImageFile const &fn);
     // img is value copyable
-    Transformable(QPixmap img) : txfs_(), img_(img) {}
+    Transformable(QPixmap img) : txfs_(), img_(img), wbox_(img.rect()) {}
 	virtual ~Transformable() = default;
     // not inline functions defined in transform.cc
     void add_from_decorator(XILDecorator const &dec);
 protected:
     /** The image to be transformed */
     QPixmap img_;
-	/** Actual implementation of transforming an image.
-	 * @param img Pixmap which will be modified in-place
-	 * @return new bounding box in parent window (screen) coordinates (aka wbox_)
-	 */
-    QRect apply(QPixmap &img);
+    /** placement on main window; width and height equivalent to the original image size times scale */
+    xwParentBox wbox_;
+
 	/** Serialise */
 	
 };

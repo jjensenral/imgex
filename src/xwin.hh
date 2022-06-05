@@ -68,15 +68,10 @@ public:
 
 
 class XILImage final : public QWindow, public Transformable {
-public:
-	/** Alias for XILImage's box in parent's coordinates */
-	typedef QRect xwParentBox;
 
  private:
     /** Reference to the image which we need to update with transformations etc */
     std::unique_ptr<Image> orig_;
-	/** placement on main window; width and height equivalent to the original image size times scale */
-	xwParentBox wbox_;
 
 	QBackingStore canvas_;
 

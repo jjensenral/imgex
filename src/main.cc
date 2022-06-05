@@ -25,9 +25,10 @@ main([[maybe_unused]] int argc, [[maybe_unused]] char *argv[])
 
 	for( auto const &fn : files ) {
 		try {
-		    ImageFile imf(fn);
-			w.mkimage(imf, fn);
-
+            ImageFile imf(fn);
+            w.mkimage(imf, fn);
+        } catch(FileNotFound const &f) {
+            std::cerr << f.what() << f.filename().toStdString() << std::endl;
 		} catch( std::exception const &e ) {
 		    qWarning("Exception %s: %s", qPrintable(fn), e.what());
 		} catch( char const *msg ) {

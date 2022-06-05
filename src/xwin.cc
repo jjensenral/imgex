@@ -18,13 +18,12 @@
 
 XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name) : QWindow(&xw), Transformable(img->getImage()),
                                                                          // Note we take ownership of the Image and img is invalid from now on
-                                                                         wbox_(), canvas_(this),
+                                                                                   canvas_(this),
                                                                                    parent_(&xw), loc(0,0), track_(false), focused_(false),
                                                                                    resize_on_zoom_(true),
                                                                                    zoom_(1.0f), name_(name)
 {
     orig_.swap(img);
-	wbox_ = img_.rect();
 	setGeometry(wbox_);
 	canvas_.resize(wbox_.size());
 	// workCopy (re)sets wbox
@@ -120,7 +119,6 @@ XILImage::mousePressEvent(QMouseEvent *ev)
             add_decorator(new XILCropDecorator());
         } else {
             // XXX assume it is the crop decorator and finalise it
-            std::cerr << "RMB\n";
             XILDecorator *dec = decors_.front();
             Transformable::add_from_decorator(*dec);
             decors_.pop_front();

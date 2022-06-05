@@ -16,11 +16,14 @@ workflow::~workflow()
 }
 
 
-Transformable::Transformable(const ImageFile &fn)
+Transformable::Transformable(const ImageFile &fn) : txfs_(), img_(), wbox_()
 {
     QString path{fn.getPath()};
     if(!img_.load(path))
         throw FileNotFound(path);
+    // XXX for now, all new transformable start at global upper left
+    wbox_ = QRect(QPoint(0,0), img_.size());
+    // TODO: restore workflow associated with ImageFile and run it
 }
 
 
@@ -28,17 +31,9 @@ void
 Transformable::add_from_decorator(const XILDecorator &dec)
 {
     transform *tf{dec.to_transform()};
+    txfs_.add(tf);
 }
 
-
-QRect
-Transformable::apply(QPixmap &img)
-{
-    QRect bbox{QPoint(0,0), img.size()};
-    std::for_each(txfs_.cbegin(), txfs_.cend(),
-                  [&](transform const *tf){ bbox = tf->apply(*this, bbox, img); });
-    return bbox;
-}
 
 
 transform *
@@ -92,7 +87,9 @@ tf_crop::clone() const
 
 QRect tf_crop::apply(Transformable &owner, QRect bbox, QPixmap &img) const
 {
-    QRect crop{box_};
-    crop &= img.rect();
-
+    QRect local{box_};
+    local &= img.rect();
+    img = img.copy(local);
+    // Return global coordinates
+    return QRect(QPoint(0, 0), local.size());
 }

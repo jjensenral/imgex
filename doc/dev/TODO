@@ -3,8 +3,11 @@ TODO
   - Persistence and sessions
   - File selection
   - Switch image within a XILWindow
-- Zoom for XILWindow should be factored out as a transform
+- Zoom for XILWindow should be factored out as a transform?
+- Consider reordering transforms in a workflow
+  - Maybe switch to float coordinates instead of integer
 - Move XILWindows from one XWindow to another (it can't just be moved with the mouse)
+- ImageFile should check whether the file exists when it's created
 
 BUGS
 - If zooming a window with an active crop, the crop does not change its size

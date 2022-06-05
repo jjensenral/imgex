@@ -16,18 +16,17 @@
 #include <iostream>
 
 
-XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name) : QWindow(&xw), Transformable(),
-                                                                         img_(std::move(img)),
+XILImage::XILImage(XWindow &xw, Image *img, QString const &name) : QWindow(&xw), Transformable(img->getImage()),
                                                                          // Note we take ownership of the Image and img is invalid from now on
-                                                                         wbox_(), canvas_(this), work_(), orig_(img_->getFilename()),
-                                                                         parent_(&xw), loc(0,0), track_(false), focused_(false),
-                                                                         resize_on_zoom_(true),
-                                                                         zoom_(1.0f), name_(name)
+                                                                         wbox_(), canvas_(this),
+                                                                                   parent_(&xw), loc(0,0), track_(false), focused_(false),
+                                                                                   resize_on_zoom_(true),
+                                                                                   zoom_(1.0f), name_(name)
 {
-	// TODO: Apply any processing to orig
-	wbox_ = orig_.rect();
-	setGeometry(orig_.rect());
-	canvas_.resize(orig_.size());
+    orig_ = img;
+	wbox_ = img_.rect();
+	setGeometry(wbox_);
+	canvas_.resize(wbox_.size());
 	// workCopy (re)sets wbox
 	workCopy();
 	show();
@@ -37,8 +36,8 @@ XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name)
 void
 XILImage::workCopy()
 {
-	work_ = orig_.copy();
-	wbox_ = work_.rect();
+	img_ = orig_->getImage().copy();
+	wbox_ = img_.rect();
 }
 
 
@@ -52,11 +51,11 @@ XILImage::render()
 	QPaintDevice *pd = canvas_.paintDevice();
 	if(!pd) {
 		qWarning("Unable to get paint device");
-		canvas_.endPaint();
+		canvas_.endPaint(); // XXX this may segfault? documentation is unclear
 		return;
 	}
 	QPainter p(pd);
-	p.drawPixmap(0, 0, work_);
+	p.drawPixmap(0, 0, img_);
 	// shared painter properties for (presumably) all decorators
 	p.setBrush(Qt::NoBrush);
 	p.setBackgroundMode(Qt::TransparentMode);
@@ -72,16 +71,16 @@ XILImage::resize(QPoint const &, bool resize_window)
 {
 	workCopy();			// reset work copy
 	// Resize around focus point, or centre?
-//	QPoint focus{ c.isNull() ? work_.rect().center() : c };
-	QPoint focus{ work_.rect().center() };
+//	QPoint focus{ c.isNull() ? img_.rect().center() : c };
+	QPoint focus{ img_.rect().center() };
 
 	// Target size
 	QSize size{ wbox_.size() };
 	size.setHeight( size.height() * zoom_ + 0.99f );
 	size.setWidth( size.width() * zoom_ + 0.99f );
 	QRect oldbox = wbox_;
-	work_ = work_.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-	wbox_.setSize( work_.size() );
+	img_ = img_.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	wbox_.setSize( img_.size() );
 	wbox_.moveCenter(focus);
 	if( resize_window ) {
 		QWindow::resize(wbox_.size());
@@ -302,6 +301,7 @@ XWindow::redraw(QRect area)
 			if(x.intersects(area))
 				x.render();
 	}
+    else std::cerr << "No paint" << std::endl;
 	qbs_.endPaint();
 	qbs_.flush(area, this);
 }
@@ -374,9 +374,7 @@ XWindow::wheelEvent(QWheelEvent *ev)
 void
 XWindow::mkimage(ImageFile const &fn, QString name)
 {
-    auto img = std::make_unique<Image>(fn);
-	ximgs_.emplace_back(*this, std::move(img), name);
-	// test to add decorator to one image
-	if(ximgs_.size() == 2)
-	    ximgs_.back().add_decorator(new BorderDecorator(QRect(), Qt::red));
+    //auto img = std::make_unique<Image>(fn);
+    auto img = new Image(fn);
+	ximgs_.emplace_back(*this, img, name);
 }

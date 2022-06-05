@@ -5,7 +5,20 @@
 #include <iosfwd>
 #include <list>
 #include <QRect>
+#include <QPixmap>
 
+
+
+class FileNotFound : std::exception
+{
+private:
+    QString fn_;
+public:
+    FileNotFound(QString const &s) : fn_(s) {}
+    ~FileNotFound() {}
+    const char * what() const noexcept override { return "File not found"; }
+    QString const &filename() noexcept { return fn_; }
+};
 
 /** Transformable defines (below) a type of image which can have transforms applied to it
  * (using a Visitor pattern)
@@ -80,18 +93,21 @@ class XILDecorator;
 /** Transformable defines (below) a type of image which can have transforms applied to it (using a Visitor pattern)
  * This class is the visitee, being visited by transform through apply.
  */
-
-class QPixmap;
+class ImageFile;
 
 class Transformable {
 private:
     workflow txfs_;
 public:
-	Transformable() noexcept = default;
+	Transformable(ImageFile const &fn);
+    // img is value copyable
+    Transformable(QPixmap img) : txfs_(), img_(img) {}
 	virtual ~Transformable() = default;
     // not inline functions defined in transform.cc
     void add_from_decorator(XILDecorator const &dec);
 protected:
+    /** The image to be transformed */
+    QPixmap img_;
 	/** Actual implementation of transforming an image.
 	 * @param img Pixmap which will be modified in-place
 	 * @return new bounding box in parent window (screen) coordinates (aka wbox_)

@@ -4,6 +4,7 @@
 
 #include <set>
 #include <QString>
+#include <QPixmap>
 #include "common.hh"
 
 
@@ -30,15 +31,22 @@ public:
 	image may be in multiple files and may have processes done to it
 	independently of its placement in a window. */
 
-class Image final {
+class Image final : public Transformable {
 	// TODO: checksum
 	ImageFile const imgf_;
     workflow wf_;
 public:
 	Image( ImageFile const &imgf );
-	~Image();
+	virtual ~Image();
+    Image(Image &) = delete;
+    Image(Image &&) = delete;
+    Image &operator=(Image const &) = delete;
+    Image &operator=(Image &&) = delete;
+    /** The image we're holding (Transformable::img_)
+     * Qt docs say QPixmap can be passed by value */
+    [[nodiscard]] QPixmap getImage() const { return img_; }
 	/** Returns a filename (basename) identifying the file */
-	QString getFilename() const noexcept;
+	[[nodiscard]] QString getFilename() const noexcept;
     /** Add a transform to the workflow for this image, taking ownership */
     void add_transform(transform const *tf) {
         wf_.add(tf);

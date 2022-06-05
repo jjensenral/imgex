@@ -1,5 +1,6 @@
 #include "transform.hh"
 #include "decor.hh"
+#include "image.hh"
 #include <algorithm>
 #include <QPixmap>
 
@@ -12,6 +13,14 @@ workflow::~workflow()
 {
     std::for_each(w_.begin(), w_.end(), [](transform const *p) { delete p; });
     w_.clear();
+}
+
+
+Transformable::Transformable(const ImageFile &fn)
+{
+    QString path{fn.getPath()};
+    if(!img_.load(path))
+        throw FileNotFound(path);
 }
 
 
@@ -61,6 +70,16 @@ QRect tf_move::apply(Transformable &owner, QRect bbox, QPixmap &img) const
 }
 
 
+transform *
+tf_move::clone() const
+{
+    tf_move *mv = new tf_move();
+    mv->x_ = x_;
+    mv->y_ = y_;
+    return mv;
+}
+
+
 
 transform *
 tf_crop::clone() const
@@ -73,7 +92,7 @@ tf_crop::clone() const
 
 QRect tf_crop::apply(Transformable &owner, QRect bbox, QPixmap &img) const
 {
-    // shift owner to crop_.topLeft
-    // scroll pixmap by crop_.topLeft
-    // truncate pixmap to crop_.size
+    QRect crop{box_};
+    crop &= img.rect();
+
 }

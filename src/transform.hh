@@ -24,7 +24,7 @@ public:
 };
 
 
-/** Pan - change the offset of the top left corner */
+/** Move in parent window - change the offset of the top left corner */
 class tf_move : public transform {
 private:
     int x_, y_;

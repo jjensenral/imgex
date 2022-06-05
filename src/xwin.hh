@@ -21,8 +21,6 @@
 
 class XWindow;
 class XMain;
-class Image;			// defined in image.hh
-class ImageFile;		// defined in image.hh
 
 
 
@@ -76,13 +74,11 @@ public:
 
  private:
     /** Reference to the image which we need to update with transformations etc */
-    std::unique_ptr<Image> img_;
+    Image *orig_;
 	/** placement on main window; width and height equivalent to the original image size times scale */
 	xwParentBox wbox_;
 
 	QBackingStore canvas_;
-	/** keep the original image and a working copy */
-	QPixmap work_, orig_;
 
 	/** Parent window */
 	QWindow *parent_;
@@ -137,10 +133,13 @@ public:
 
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
+    XILImage(XWindow &, Image *, QString const &);
 	~XILImage() = default;
 	XILImage(XILImage const &) = delete;
-	XILImage(XILImage &&) = default;
+    // base class QImage has deleted move constructor
+	XILImage(XILImage &&) = delete;
 	XILImage &operator=(XILImage const &) = delete;
+    XILImage &operator=(XILImage &&) = delete;
 
 	/** Call clear */
 	// void clear(Display *d, Window w) const { XClearArea(d, w, wbox_.x, wbox_.y, wbox_.h, wbox_.y, 0); }

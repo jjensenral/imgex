@@ -51,7 +51,7 @@ ImageFile::~ImageFile() noexcept
 
 
 
-Image::Image(ImageFile const &imgf) : imgf_(imgf)
+Image::Image(ImageFile const &imgf) : Transformable(imgf), wf_(), imgf_(imgf)
 {
 }
 

@@ -74,7 +74,7 @@ public:
 
  private:
     /** Reference to the image which we need to update with transformations etc */
-    Image *orig_;
+    std::unique_ptr<Image> orig_;
 	/** placement on main window; width and height equivalent to the original image size times scale */
 	xwParentBox wbox_;
 
@@ -133,7 +133,6 @@ public:
 
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
-    XILImage(XWindow &, Image *, QString const &);
 	~XILImage() = default;
 	XILImage(XILImage const &) = delete;
     // base class QImage has deleted move constructor

@@ -16,14 +16,14 @@
 #include <iostream>
 
 
-XILImage::XILImage(XWindow &xw, Image *img, QString const &name) : QWindow(&xw), Transformable(img->getImage()),
+XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name) : QWindow(&xw), Transformable(img->getImage()),
                                                                          // Note we take ownership of the Image and img is invalid from now on
                                                                          wbox_(), canvas_(this),
                                                                                    parent_(&xw), loc(0,0), track_(false), focused_(false),
                                                                                    resize_on_zoom_(true),
                                                                                    zoom_(1.0f), name_(name)
 {
-    orig_ = img;
+    orig_.swap(img);
 	wbox_ = img_.rect();
 	setGeometry(wbox_);
 	canvas_.resize(wbox_.size());
@@ -374,7 +374,6 @@ XWindow::wheelEvent(QWheelEvent *ev)
 void
 XWindow::mkimage(ImageFile const &fn, QString name)
 {
-    //auto img = std::make_unique<Image>(fn);
-    auto img = new Image(fn);
-	ximgs_.emplace_back(*this, img, name);
+    auto img = std::make_unique<Image>(fn);
+	ximgs_.emplace_back(*this, std::move(img), name);
 }

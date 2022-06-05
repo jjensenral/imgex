@@ -167,6 +167,7 @@ public:
 		decors_.push_back(dec);
 	}
 
+    virtual void apply(transform const *) override;
 	friend class XWindow;
 };
 

@@ -111,6 +111,8 @@ public:
 	virtual ~Transformable() = default;
     // not inline functions defined in transform.cc
     void add_from_decorator(XILDecorator const &dec);
+    /** Apply a single transform */
+    virtual void apply(transform const *);
 protected:
     /** The image to be transformed */
     QPixmap img_;

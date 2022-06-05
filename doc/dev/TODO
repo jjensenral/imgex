@@ -4,6 +4,7 @@ TODO
   - File selection
   - Switch image within a XILWindow
 - Zoom for XILWindow should be factored out as a transform?
+  - Similarly, move could/should be stored as a transform
 - Consider reordering transforms in a workflow
   - Maybe switch to float coordinates instead of integer
 - Move XILWindows from one XWindow to another (it can't just be moved with the mouse)

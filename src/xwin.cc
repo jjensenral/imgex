@@ -256,6 +256,15 @@ XILImage::parent_box() const
 }
 
 
+void XILImage::apply(const transform *tf)
+{
+    if(tf->image()) {
+        orig_->apply(tf);
+    }
+    Transformable::apply(tf);
+}
+
+
 XWindow::XWindow() : QWindow(static_cast<QWindow *>(nullptr)), qbs_(this)
 {
 	//showMaximized();

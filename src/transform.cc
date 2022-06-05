@@ -35,6 +35,11 @@ Transformable::add_from_decorator(const XILDecorator &dec)
 }
 
 
+void Transformable::apply(const transform *tf)
+{
+    tf->apply(*this, img_.rect(), img_);
+}
+
 
 transform *
 tf_zoom::clone() const

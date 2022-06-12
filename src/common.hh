@@ -6,7 +6,9 @@
 #include <list>
 #include <QRect>
 #include <QPixmap>
-
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/list.hpp>
 
 
 class FileNotFound : std::exception
@@ -53,14 +55,23 @@ class transform {
      * @param img Image; will be updated in place
      * @return Updated global coordinates
      */
-    virtual QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const
+    [[nodiscard]] virtual QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const
     {
         /* NOP transform does nothing */
         return bbox;
     }
-protected:
+
 	/** An arbitrary identifier for each type */
 	[[nodiscard]] virtual transform_id type() const noexcept { return transform_id::TX_NOP; }
+
+private:
+    int x_;
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive &ar, const unsigned int version)
+    {
+        ar & x_;
+    }
 };
 
 
@@ -70,15 +81,31 @@ protected:
  */
 class workflow final {
 public:
-    typedef std::list<transform const *> workflow_t;
+    typedef std::list<transform *> workflow_t;
 private:
 	 workflow_t w_;
+     friend class boost::serialization::access;
+
+    template<class Archive>
+    void serialize(Archive &ar, const unsigned int version)
+    {
+        // This doesn't work:
+        // ar & w_;
+        std::for_each(w_.begin(), w_.end(),
+                      [&ar](transform *tf) { ar & *tf; });
+    }
 public:
 	workflow() noexcept : w_() {}
 	~workflow();
+    // Since workflow owns its pointers, we must prevent copying
+    workflow(workflow const &) = delete;
+    workflow &operator=(workflow const &) = delete;
+    // but moving is OK
+    workflow(workflow &&) = default;
+    workflow &operator=(workflow &&) = default;
 
     /** Add a transform to a workflow, taking ownership */
-	void add(transform const *t) { w_.push_back(t); }
+	void add(transform *t) { w_.push_back(t); }
 
 	[[nodiscard]] workflow_t::iterator begin() noexcept { return w_.begin(); }
     [[nodiscard]] workflow_t::iterator end() noexcept { return w_.end(); }
@@ -96,11 +123,12 @@ class XILDecorator;
  * This class is the visitee, being visited by transform through apply.
  */
 class ImageFile;
-
+class XWindow;
 class Transformable {
 private:
     workflow txfs_;
-
+    // XXX temporary hack
+    friend class XWindow;
 public:
     /** Alias for XILImage's box in parent's coordinates */
     typedef QRect xwParentBox;
@@ -112,7 +140,13 @@ public:
     // not inline functions defined in transform.cc
     void add_from_decorator(XILDecorator const &dec);
     /** Apply a single transform */
-    virtual void apply(transform const *);
+    virtual void apply(transform *);
+
+    /** Move to new topleft global position */
+    virtual void moveto(QPoint point);
+
+    /** Add a transform, taking ownership of it */
+    virtual void add_transform(transform *tf);
 protected:
     /** The image to be transformed */
     QPixmap img_;
@@ -120,7 +154,8 @@ protected:
     xwParentBox wbox_;
 
 	/** Serialise */
-	
+
+
 };
 
 

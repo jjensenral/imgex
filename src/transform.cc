@@ -11,7 +11,7 @@
 
 workflow::~workflow()
 {
-    std::for_each(w_.begin(), w_.end(), [](transform const *p) { delete p; });
+    //std::for_each(w_.begin(), w_.end(), [](transform const *p) { delete p; });
     w_.clear();
 }
 
@@ -31,13 +31,26 @@ void
 Transformable::add_from_decorator(const XILDecorator &dec)
 {
     transform *tf{dec.to_transform()};
-    txfs_.add(tf);
+    add_transform(tf);
+    apply(tf);
 }
 
 
-void Transformable::apply(const transform *tf)
+void Transformable::apply(transform *tf)
 {
-    tf->apply(*this, img_.rect(), img_);
+    wbox_ = tf->apply(*this, img_.rect(), img_);
+}
+
+
+void Transformable::moveto(QPoint point)
+{
+    wbox_.setTopLeft(point);
+}
+
+void Transformable::add_transform(transform *tf)
+{
+    txfs_.add(tf);
+    apply(tf);
 }
 
 
@@ -85,16 +98,20 @@ transform *
 tf_crop::clone() const
 {
     tf_crop *c = new tf_crop();
-    c->box_ = box_;
+    c->x_ = x_; c->y_ = y_; c->w_ = w_; c->h_ = h_;
     return c;
 }
 
 
 QRect tf_crop::apply(Transformable &owner, QRect bbox, QPixmap &img) const
 {
-    QRect local{box_};
-    local &= img.rect();
-    img = img.copy(local);
+    QRect box(x_, y_, w_, h_);
+    img = img.copy(box);
+    // Image is moved to where the crop rectangle is (but in global coords)
+    bbox.adjust(x_, y_, 0, 0);
+    owner.moveto(bbox.topLeft());
+    bbox.setWidth(box.width());
+    bbox.setHeight(box.height());
     // Return global coordinates
-    return QRect(QPoint(0, 0), local.size());
+    return transform::apply(owner, bbox, img);
 }

@@ -10,6 +10,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt5 COMPONENTS Gui REQUIRED)
 
+set(Boost_USE_STATIC_LIBS OFF)
+set(Boost_USE_MULTITHREADED OFF)
+set(Boost_USE_STATIC_RUNTIME OFF)
+find_package(Boost COMPONENTS serialization)
+
 add_executable(imgex
   src/main.cc
   src/image.cc
@@ -20,3 +25,4 @@ add_executable(imgex
   )
 
 target_link_libraries(imgex Qt5::Gui)
+target_link_libraries(imgex ${Boost_LIBRARIES})

@@ -21,6 +21,14 @@ public:
     transform *clone() const override;
 
     QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
+
+private:
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive &ar, const unsigned int version)
+    {
+        ar & zoom_;
+    }
 };
 
 
@@ -36,21 +44,41 @@ public:
     transform *clone() const override;
 
     QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
+
+private:
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive &ar, const unsigned int version)
+    {
+        ar & x_;
+        ar & y_;
+    }
 };
 
 
 class tf_crop : public transform {
 private:
     /** crop box relative in pixmap (local) coordinates */
-    QRect box_;
+    int x_, y_, w_, h_;
 protected:
     transform_id type() const noexcept override { return transform_id::TX_CROP; }
 public:
     tf_crop() noexcept {}
-    tf_crop(QRect const &qr) noexcept : box_(qr) {}
+    tf_crop(QRect const &qr) noexcept : x_(qr.x()), y_(qr.y()), w_(qr.width()), h_(qr.height()) {}
     transform *clone() const override;
 
     QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
+
+private:
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive &ar, const unsigned int version)
+    {
+        ar & x_;
+        ar & y_;
+        ar & w_;
+        ar & h_;
+    }
 };
 
 #endif

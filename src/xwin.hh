@@ -111,6 +111,8 @@ class XILImage final : public QWindow, public Transformable {
 	 * \return true if event handled */
 	bool decor_event(QEvent &);
 
+    void add_transform(transform *) override;
+
 #if 0
 	/** Move window */
 	void moveto(int x, int y) noexcept
@@ -167,7 +169,7 @@ public:
 		decors_.push_back(dec);
 	}
 
-    virtual void apply(transform const *) override;
+    virtual void apply(transform *tf) override;
 	friend class XWindow;
 };
 

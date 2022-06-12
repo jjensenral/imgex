@@ -48,7 +48,7 @@ public:
 	/** Returns a filename (basename) identifying the file */
 	[[nodiscard]] QString getFilename() const noexcept;
     /** Add a transform to the workflow for this image, taking ownership */
-    virtual void apply(transform const *tf) {
+    virtual void apply(transform *tf) {
         wf_.add(tf);
         Transformable::apply(tf);
     }

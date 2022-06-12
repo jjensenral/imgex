@@ -1,6 +1,7 @@
 #include "xwin.hh"
 #include "image.hh"
 #include "decor.hh"
+#include "transform.hh"
 #include <iterator>
 #include <exception>
 #include <algorithm>
@@ -14,6 +15,7 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <iostream>
+#include <fstream>
 
 
 XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name) : QWindow(&xw), Transformable(img->getImage()),
@@ -256,13 +258,25 @@ XILImage::parent_box() const
 }
 
 
-void XILImage::apply(const transform *tf)
+void XILImage::apply(transform *tf)
 {
     if(tf->image()) {
         orig_->apply(tf);
     }
     Transformable::apply(tf);
 }
+
+
+void
+XILImage::add_transform(transform *tf)
+{
+    // Some transforms are preserved with the original image
+    if(tf->image()) {
+        orig_->add_transform(tf->clone());
+    }
+    Transformable::add_transform(tf);
+}
+
 
 
 XWindow::XWindow() : QWindow(static_cast<QWindow *>(nullptr)), qbs_(this)
@@ -337,7 +351,18 @@ void
 XWindow::mousePressEvent(QMouseEvent *ev)
 {
 	XILImage *w = img_at(ev->globalPos());
-	if(!w) return;
+	if(!w) {
+        // XXX temporary hack
+        std::ofstream fred("data");
+        boost::archive::text_oarchive oa(fred);
+        std::for_each(ximgs_.begin(),ximgs_.end(),
+                      [&oa](XILImage  &xim)
+                      {
+                          workflow &w = xim.orig_->txfs_;
+                          oa << w;
+                      });
+        return;
+    }
 	w->mousePressEvent(ev);
 	QWindow::mousePressEvent(ev);
 }

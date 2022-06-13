@@ -27,6 +27,7 @@ private:
     template<class Archive>
     void serialize(Archive &ar, const unsigned int version)
     {
+        ar & boost::serialization::base_object<transform>(*this);
         ar & zoom_;
     }
 };
@@ -50,6 +51,7 @@ private:
     template<class Archive>
     void serialize(Archive &ar, const unsigned int version)
     {
+        ar & boost::serialization::base_object<transform>(*this);
         ar & x_;
         ar & y_;
     }
@@ -74,6 +76,7 @@ private:
     template<class Archive>
     void serialize(Archive &ar, const unsigned int version)
     {
+        ar & boost::serialization::base_object<transform>(*this);
         ar & x_;
         ar & y_;
         ar & w_;

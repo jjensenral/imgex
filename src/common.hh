@@ -89,10 +89,7 @@ private:
     template<class Archive>
     void serialize(Archive &ar, const unsigned int version)
     {
-        // This doesn't work:
-        // ar & w_;
-        std::for_each(w_.begin(), w_.end(),
-                      [&ar](transform *tf) { ar & *tf; });
+        ar & w_;
     }
 public:
 	workflow() noexcept : w_() {}

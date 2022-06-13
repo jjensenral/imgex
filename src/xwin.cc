@@ -355,6 +355,10 @@ XWindow::mousePressEvent(QMouseEvent *ev)
         // XXX temporary hack
         std::ofstream fred("data");
         boost::archive::text_oarchive oa(fred);
+        // RTFM: ensure transforms are known to the archive
+        oa.template register_type<tf_crop>();
+        oa.template register_type<tf_move>();
+        oa.template register_type<tf_zoom>();
         std::for_each(ximgs_.begin(),ximgs_.end(),
                       [&oa](XILImage  &xim)
                       {

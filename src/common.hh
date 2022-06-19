@@ -10,6 +10,7 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/list.hpp>
 
+class QString;
 
 class FileNotFound : std::exception
 {
@@ -20,6 +21,13 @@ public:
     ~FileNotFound() {}
     const char * what() const noexcept override { return "File not found"; }
     QString const &filename() const noexcept { return fn_; }
+};
+
+// XXX should not be needed
+class bad_transform : std::exception
+{
+public:
+    const char *what() const noexcept override { return "bad transfprm"; }
 };
 
 /** Transformable defines (below) a type of image which can have transforms applied to it
@@ -64,7 +72,20 @@ class transform {
 	/** An arbitrary identifier for each type */
 	[[nodiscard]] virtual transform_id type() const noexcept { return transform_id::TX_NOP; }
 
+    /** operator+ is used to merge transforms into each other */
+    virtual transform &operator+=(transform const &other)
+    {
+        // The default action is that the latter supersedes the former
+        copy_from(other);
+        return *this;
+    }
 private:
+    /** Merge another transform of the same type into this one
+     * The default is that the last supersedes the prior
+     * */
+    virtual void merge(transform *other);
+    /** Copy another transform into this one (if they are of the same type */
+    virtual void copy_from(transform const &other) {}
     int x_;
     friend class boost::serialization::access;
     template<class Archive>
@@ -101,8 +122,8 @@ public:
     workflow(workflow &&) = default;
     workflow &operator=(workflow &&) = default;
 
-    /** Add a transform to a workflow, taking ownership */
-	void add(transform *t) { w_.push_back(t); }
+    /** Add a transform to a workflow, taking ownership of it */
+	void add(transform *t);
 
 	[[nodiscard]] workflow_t::iterator begin() noexcept { return w_.begin(); }
     [[nodiscard]] workflow_t::iterator end() noexcept { return w_.end(); }
@@ -139,15 +160,22 @@ public:
     /** Apply a single transform */
     virtual void apply(transform *);
 
+    /** reset working copy of image to its Image */
+    virtual void workCopy() {}
+
     /** Move to new topleft global position */
     virtual void moveto(QPoint point);
+
+    /** Resize the image to wbox
+     * Does not scale the image (the zoom transform does that) */
+    virtual void resize() {};
 
     /** Add a transform, taking ownership of it */
     virtual void add_transform(transform *tf);
 protected:
     /** The image to be transformed */
     QPixmap img_;
-    /** placement on main window; width and height equivalent to the original image size times scale */
+    /** placement on main window; width and height equivalent to the image size times scale */
     xwParentBox wbox_;
 
 	/** Serialise */

@@ -68,25 +68,12 @@ XILImage::render()
 
 
 void
-XILImage::resize(QPoint const &, bool resize_window)
+XILImage::resize()
 {
-	workCopy();			// reset work copy
-	// Resize around focus point, or centre?
-//	QPoint focus{ c.isNull() ? img_.rect().center() : c };
-	QPoint focus{ img_.rect().center() };
+    QRect oldbox(wbox_);
+	QWindow::resize(wbox_.size());
+	canvas_.resize(wbox_.size());
 
-	// Target size
-	QSize size{ wbox_.size() };
-	size.setHeight( size.height() * zoom_ + 0.99f );
-	size.setWidth( size.width() * zoom_ + 0.99f );
-	QRect oldbox = wbox_;
-	img_ = img_.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-	wbox_.setSize( img_.size() );
-	wbox_.moveCenter(focus);
-	if( resize_window ) {
-		QWindow::resize(wbox_.size());
-		canvas_.resize(wbox_.size());
-	}
 	mkexpose( oldbox | wbox_ );
 }
 
@@ -113,7 +100,7 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 	    break;
 	case Qt::MiddleButton:
 		zoom_ = 1.0f;
-		resize(ev->globalPos(), resize_on_zoom_);
+            resize();
 		break;
 	case Qt::RightButton:
         // XXX for now, just start or end the crop process
@@ -192,11 +179,14 @@ XILImage::wheelEvent(QWheelEvent *ev)
 	// Wheel back is zoom out (ie shrink)
 		zoom_ /= 1.1;
 	// ev->globalPos() is deprecated in 5.15 at least
-#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
-    resize(ev->globalPosition().toPoint(), resize_on_zoom_);
-#else
-    resize(ev->globalPos(), resize_on_zoom_);
-#endif
+// #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+//    resize(ev->globalPosition().toPoint(), resize_on_zoom_);
+std::cerr << "ZOOM " << zoom_ << std::endl;
+    add_transform(new tf_zoom(zoom_));
+    wbox_.setHeight(wbox_.height()*zoom_+0.99f);
+    wbox_.setWidth((wbox_.width()*zoom_+0.99f));
+    resize();
+
 	xwParentBox new_area = parent_box();
 	mkexpose( area | new_area );
 	QWindow::wheelEvent(ev);
@@ -252,16 +242,14 @@ XILImage::decor_event(QEvent &qev)
 XILImage::xwParentBox
 XILImage::parent_box() const
 {
-	QSize sz(width(), height());
-	xwParentBox bbox( geometry().topLeft(), sz);
-	return bbox;
+    return wbox_;
 }
 
 
 void XILImage::apply(transform *tf)
 {
     if(tf->image()) {
-        orig_->apply(tf);
+        orig_->add_transform(tf);
     }
     Transformable::apply(tf);
 }

@@ -30,6 +30,8 @@ private:
         ar & boost::serialization::base_object<transform>(*this);
         ar & zoom_;
     }
+
+    void copy_from(const transform &other) override;
 };
 
 
@@ -55,6 +57,7 @@ private:
         ar & x_;
         ar & y_;
     }
+    void copy_from(const transform &other) override;
 };
 
 
@@ -82,6 +85,7 @@ private:
         ar & w_;
         ar & h_;
     }
+    void copy_from(const transform &other) override;
 };
 
 #endif

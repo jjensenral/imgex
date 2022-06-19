@@ -52,6 +52,8 @@ public:
         wf_.add(tf);
         Transformable::apply(tf);
     }
+    // XXX temporary hack: nothing gets added to the Image
+    void add_transform(transform *tf) override {}
 };
 
 

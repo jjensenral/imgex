@@ -95,9 +95,6 @@ class XILImage final : public QWindow, public Transformable {
 
 	QString name_;
 
-	/** (Re)copy orig to working copy */
-	void workCopy();
-
 	/** Bounding box in parent's coordinates */
 	[[nodiscard]] xwParentBox parent_box() const;
 
@@ -123,10 +120,8 @@ class XILImage final : public QWindow, public Transformable {
 #endif
 
 	/** Resize window and image to size relative to original image
-	 *  \param point (absolute) to resize over or null if use centre
-	 *  \param bool whether to resize the window or just the work copy.
 	*/
-	void resize(QPoint const &, bool);
+    void resize() override;
 
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
@@ -137,7 +132,10 @@ public:
 	XILImage &operator=(XILImage const &) = delete;
     XILImage &operator=(XILImage &&) = delete;
 
-	/** Call clear */
+    /** (Re)copy orig to working copy */
+    void workCopy() override;
+
+    /** Call clear */
 	// void clear(Display *d, Window w) const { XClearArea(d, w, wbox_.x, wbox_.y, wbox_.h, wbox_.y, 0); }
 	/** Does this image contain point x,y (as mapped on window) */
 	bool contains(int x, int y) const noexcept { return wbox_.contains(x,y); }

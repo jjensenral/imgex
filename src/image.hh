@@ -44,7 +44,7 @@ public:
     Image &operator=(Image &&) = delete;
     /** The image we're holding (Transformable::img_)
      * Qt docs say QPixmap can be passed by value */
-    [[nodiscard]] QPixmap getImage() const { return img_; }
+    [[nodiscard]] const QPixmap getImage() const { return img_; }
 	/** Returns a filename (basename) identifying the file */
 	[[nodiscard]] QString getFilename() const noexcept;
     /** Add a transform to the workflow for this image, taking ownership */

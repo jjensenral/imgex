@@ -120,8 +120,9 @@ class XILImage final : public QWindow, public Transformable {
 #endif
 
 	/** Resize window and image to size relative to original image
+	 * \param oldbox the pre-resize box; if null, the current box is assumed
 	*/
-    void resize() override;
+    void resize(QRect const &) override;
 
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
@@ -134,6 +135,9 @@ public:
 
     /** (Re)copy orig to working copy */
     void workCopy() override;
+
+    /** (Re)run workflow on current image */
+    void run() override;
 
     /** Call clear */
 	// void clear(Display *d, Window w) const { XClearArea(d, w, wbox_.x, wbox_.y, wbox_.h, wbox_.y, 0); }
@@ -167,7 +171,7 @@ public:
 		decors_.push_back(dec);
 	}
 
-    virtual void apply(transform *tf) override;
+    virtual void apply(transform const *tf) override;
 	friend class XWindow;
 };
 

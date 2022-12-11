@@ -46,13 +46,10 @@ class transform {
 	transform() = default;
 	virtual ~transform() {}
     transform(transform const &) = default;
+    // FIXME should use smart ptr?
     virtual transform *clone() const { return new transform(); }
-    enum class transform_id { TX_NOP, TX_CROP, TX_ZOOM, TX_MOVE  };
-	/** Process a XILImage (defined in xwin.hh) or an Image (defined in image.hh)
-	 * The intention is that XILImage is transformed per-window and can differ for each window that the image appears in,
-	 * whereas Image is transformed identically each time the same image is loaded.
-	 */
-	virtual void process(Transformable &) {}
+    enum class transform_id { TX_NOP, TX_CROP, TX_ZOOM_TO, TX_MOVE_TO  };
+
     /** Return whether this transform should be stored with the image.
      * The alternative is that it is session specific and is stored with the session.
      */
@@ -81,7 +78,7 @@ class transform {
     }
 private:
     /** Merge another transform of the same type into this one
-     * The default is that the last supersedes the prior
+     * The default is that the other supersedes this one
      * */
     virtual void merge(transform *other);
     /** Copy another transform into this one (if they are of the same type */
@@ -93,6 +90,8 @@ private:
     {
         ar & x_;
     }
+    friend std::ostream &operator<<(std::ostream &, transform const &);
+    virtual void print(std::ostream &) const;
 };
 
 
@@ -130,6 +129,16 @@ public:
 	/* Iterators are constant so it's safe to pass them on */
 	[[nodiscard]] workflow_t::const_iterator cbegin() const noexcept { return w_.cbegin(); }
 	[[nodiscard]] workflow_t::const_iterator cend() const noexcept { return w_.cend(); }
+
+    friend std::ostream &operator<<(std::ostream &, workflow const &);
+
+private:
+    /** Utility function for removing specific types from the workflow
+      * \param type the type to remove
+      * \param cb callback to call on the transform prior to removal, or nullptr
+      */
+    void remove_type(transform::transform_id type, void (*cb)(transform const *) = nullptr);
+
 };
 
 
@@ -144,7 +153,6 @@ class ImageFile;
 class XWindow;
 class Transformable {
 private:
-    workflow txfs_;
     // XXX temporary hack
     friend class XWindow;
 public:
@@ -158,7 +166,10 @@ public:
     // not inline functions defined in transform.cc
     void add_from_decorator(XILDecorator const &dec);
     /** Apply a single transform */
-    virtual void apply(transform *);
+    virtual void apply(transform const *);
+
+    /** Run the current workflow on the current image */
+    virtual void run();
 
     /** reset working copy of image to its Image */
     virtual void workCopy() {}
@@ -167,8 +178,9 @@ public:
     virtual void moveto(QPoint point);
 
     /** Resize the image to wbox
-     * Does not scale the image (the zoom transform does that) */
-    virtual void resize() {};
+     * Does not scale the image (the zoom transform does that)
+     * \param oldbox pre-resize box, if null the current size is used */
+    virtual void resize(QRect const &oldbox) {};
 
     /** Add a transform, taking ownership of it */
     virtual void add_transform(transform *tf);
@@ -181,6 +193,7 @@ protected:
 	/** Serialise */
 
 
+    workflow txfs_;
 };
 
 

@@ -10,14 +10,14 @@
 
 
 /** Zoom */
-class tf_zoom : public transform {
+class tf_zoom_to : public transform {
 private:
     float zoom_;
 protected:
-    transform_id type() const noexcept override { return transform_id::TX_ZOOM; }
+    transform_id type() const noexcept override { return transform_id::TX_ZOOM_TO; }
 public:
-    tf_zoom() noexcept : transform(), zoom_(1.0f) {}
-    tf_zoom(float z) noexcept : transform(), zoom_(z) {}
+    tf_zoom_to() noexcept : transform(), zoom_(1.0f) {}
+    tf_zoom_to(float z) noexcept : transform(), zoom_(z) {}
     transform *clone() const override;
 
     QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
@@ -32,18 +32,20 @@ private:
     }
 
     void copy_from(const transform &other) override;
+    void print(std::ostream &) const override;
 };
 
 
 /** Move in parent window - change the offset of the top left corner */
-class tf_move : public transform {
+class tf_move_to : public transform {
 private:
     int x_, y_;
 protected:
-    transform_id type() const noexcept override { return transform_id::TX_MOVE; }
+    transform_id type() const noexcept override { return transform_id::TX_MOVE_TO; }
 public:
-    tf_move() noexcept : x_(0), y_(0) {}
-    tf_move(int x, int y) noexcept : x_(x), y_(y) {}
+    tf_move_to() noexcept : x_(0), y_(0) {}
+    tf_move_to(int x, int y) noexcept : x_(x), y_(y) {}
+    tf_move_to(QPoint const &p) noexcept : x_(p.x()), y_(p.y()) {}
     transform *clone() const override;
 
     QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
@@ -58,6 +60,7 @@ private:
         ar & y_;
     }
     void copy_from(const transform &other) override;
+    void print(std::ostream &) const override;
 };
 
 
@@ -86,6 +89,7 @@ private:
         ar & h_;
     }
     void copy_from(const transform &other) override;
+    void print(std::ostream &) const override;
 };
 
 #endif

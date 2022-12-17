@@ -1,95 +1,120 @@
-#ifndef __IMGEX_TRANSFORM_H
-#define __IMGEX_TRANSFORM_H
+#ifndef __IMGEX_COMMON_H
+#define __IMGEX_COMMON_H
 
-/* Transforms - how to transform an image after it's loaded.
- * The base class for Transform is implemented in common.hh
- * Some transforms are stored with the image; some are session specific
- */
-#include "common.hh"
+
+#include <iosfwd>
+#include <list>
 #include <QRect>
+#include <QPixmap>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/list.hpp>
 
+class QString;
 
-/** Zoom */
-class tf_zoom_to : public transform {
+class FileNotFound : std::exception
+{
 private:
-    float zoom_;
-protected:
-    transform_id type() const noexcept override { return transform_id::TX_ZOOM_TO; }
+    QString fn_;
 public:
-    tf_zoom_to() noexcept : transform(), zoom_(1.0f) {}
-    tf_zoom_to(float z) noexcept : transform(), zoom_(z) {}
-    transform *clone() const override;
-
-    QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
-
-private:
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive &ar, const unsigned int version)
-    {
-        ar & boost::serialization::base_object<transform>(*this);
-        ar & zoom_;
-    }
-
-    void copy_from(const transform &other) override;
-    void print(std::ostream &) const override;
+    FileNotFound(QString const &s) : fn_(s) {}
+    ~FileNotFound() {}
+    const char * what() const noexcept override { return "File not found"; }
+    QString const &filename() const noexcept { return fn_; }
 };
 
 
-/** Move in parent window - change the offset of the top left corner */
-class tf_move_to : public transform {
+/** transform is basically a list of transforms.
+ * We have to store pointer to transforms (of some description) or we will slice them.
+ */
+class transform final {
 private:
-    int x_, y_;
-protected:
-    transform_id type() const noexcept override { return transform_id::TX_MOVE_TO; }
-public:
-    tf_move_to() noexcept : x_(0), y_(0) {}
-    tf_move_to(int x, int y) noexcept : x_(x), y_(y) {}
-    tf_move_to(QPoint const &p) noexcept : x_(p.x()), y_(p.y()) {}
-    transform *clone() const override;
-
-    QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
-
-private:
+    struct transform_t;
+    struct transform_t *impl_;
     friend class boost::serialization::access;
+
     template<class Archive>
-    void serialize(Archive &ar, const unsigned int version)
-    {
-        ar & boost::serialization::base_object<transform>(*this);
-        ar & x_;
-        ar & y_;
-    }
-    void copy_from(const transform &other) override;
-    void print(std::ostream &) const override;
+    void serialize(Archive &ar, const unsigned int version);
+
+public:
+	transform();
+	~transform();
+    transform(transform const &) = delete;
+    transform &operator=(transform const &);
+    transform(transform &&) = default;
+    transform &operator=(transform &&) = default;
+
+    //** Set move transform to absolute (parent window) coordinate
+    void move_to(QPoint) noexcept;
+    //** Set (absolute) zoom level
+    void zoom_to(float) noexcept;
+    //** Crop takes relative coordinates (within local pixmap)
+    void crop(QRect) noexcept;
+
+    friend std::ostream &operator<<(std::ostream &, transform const &);
+
+    float get_zoom() const noexcept;
 };
 
 
-class tf_crop : public transform {
+// The XILDecorator base class is defined in xwin.hh
+// derived classes in decor.hh
+class XILDecorator;
+
+/** Transformable defines (below) a type of image which can have transforms applied to it (using a Visitor pattern)
+ * This class is the visitee, being visited by transform through apply.
+ */
+class ImageFile;
+class XWindow;
+class Transformable {
 private:
-    /** crop box relative in pixmap (local) coordinates */
-    int x_, y_, w_, h_;
-protected:
-    transform_id type() const noexcept override { return transform_id::TX_CROP; }
+    // XXX temporary hack
+    friend class XWindow;
 public:
-    tf_crop() noexcept {}
-    tf_crop(QRect const &qr) noexcept : x_(qr.x()), y_(qr.y()), w_(qr.width()), h_(qr.height()) {}
-    transform *clone() const override;
+    /** Alias for XILImage's box in parent's coordinates */
+    typedef QRect xwParentBox;
 
-    QRect apply(Transformable &owner, QRect bbox, QPixmap &img) const override;
+    Transformable(ImageFile const &fn);
+    // img is value copyable
+    Transformable(QPixmap img) : img_(img), wbox_(img.rect()), txfs_() {}
+	virtual ~Transformable() = default;
+    // not inline functions defined in transform.cc
+    void add_from_decorator(XILDecorator const &dec);
 
-private:
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive &ar, const unsigned int version)
-    {
-        ar & boost::serialization::base_object<transform>(*this);
-        ar & x_;
-        ar & y_;
-        ar & w_;
-        ar & h_;
-    }
-    void copy_from(const transform &other) override;
-    void print(std::ostream &) const override;
+    /** Run the current transform on the current image */
+    virtual void run();
+
+    /** reset working copy of image to its Image */
+    virtual void copy_from(Transformable const &orig);
+
+    /** Move to new topleft global position */
+    virtual QRect move_to(QPoint point);
+
+    /** Zoom to (absolute value) */
+    virtual QRect zoom_to(float);
+
+    /** Crop to relative box (in local pixmap coordinates) */
+    virtual QRect crop(QRect);
+
+
+    /** Resize the image to wbox
+     * Does not scale the image (the zoom transform does that)
+     * \param oldbox pre-resize box, if null the current size is used */
+    virtual void resize(QRect const &oldbox) {};
+
+protected:
+    /** The image to be transformed */
+    QPixmap img_;
+    /** placement on main window; width and height equivalent to the image size times scale */
+    xwParentBox wbox_;
+
+	/** Serialise */
+
+
+    transform txfs_;
 };
+
+
+
 
 #endif

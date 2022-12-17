@@ -39,7 +39,7 @@ public:
 
     virtual void render(QPainter &qp) override;
 
-    virtual transform *to_transform() const override;
+    //virtual transform *to_transform() const override;
 
     event_status_t mPress(QMouseEvent const &) override;
     event_status_t mMove(QMouseEvent const &) override;

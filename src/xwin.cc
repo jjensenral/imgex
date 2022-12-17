@@ -1,7 +1,6 @@
 #include "xwin.hh"
 #include "image.hh"
 #include "decor.hh"
-#include "transform.hh"
 #include <iterator>
 #include <exception>
 #include <algorithm>
@@ -26,19 +25,20 @@ XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name)
                                                                                    zoom_(1.0f), name_(name)
 {
     orig_.swap(img);
-	setGeometry(wbox_);
-	canvas_.resize(wbox_.size());
-	// workCopy (re)sets wbox
-	workCopy();
+	// copy_from (re)sets wbox - we use the parent method since we're not ready to draw yet
+    Transformable::copy_from(*orig_);
+    setGeometry(wbox_);
+    canvas_.resize(wbox_.size());
 	show();
 }
 
 
 void
-XILImage::workCopy()
+XILImage::copy_from(Transformable const &orig)
 {
-	img_ = orig_->getImage().copy();
-	wbox_ = img_.rect();
+    QRect oldbox{wbox_};
+    Transformable::copy_from(orig);
+    mkexpose(oldbox | wbox_);
 }
 
 
@@ -130,7 +130,7 @@ XILImage::mouseReleaseEvent(QMouseEvent *ev)
 	switch(ev->button()) {
 	case Qt::LeftButton:
 		track_ = false;
-        add_transform(new tf_move_to(wbox_.topLeft()));
+        move_to(wbox_.topLeft());
 	default:
 		break;
 	}
@@ -182,19 +182,8 @@ XILImage::wheelEvent(QWheelEvent *ev)
 	// ev->globalPos() is deprecated in 5.15 at least
 // #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
 //    resize(ev->globalPosition().toPoint(), resize_on_zoom_);
-    transform *z = new tf_zoom_to(zoom_);
-    apply(z);
-    add_transform(z);
-    // debug
-    std::cerr << txfs_;
 
-    QRect oldbox{wbox_};
-    wbox_.setHeight(wbox_.height()*zoom_+0.99f);
-    wbox_.setWidth((wbox_.width()*zoom_+0.99f));
-    resize(oldbox);
-
-	xwParentBox new_area = parent_box();
-	mkexpose( area | new_area );
+	mkexpose(zoom_to(zoom_));
 	QWindow::wheelEvent(ev);
 }
 
@@ -252,35 +241,13 @@ XILImage::parent_box() const
 }
 
 
-void XILImage::apply(transform const *tf)
-{
-//    if(tf->image()) {
-//        orig_->add_transform(tf);
-//    }
-    Transformable::apply(tf);
-}
-
-
-void
-XILImage::add_transform(transform *tf)
-{
-    // Some transforms are preserved with the original image
-//    if(tf->image()) {
-//        orig_->add_transform(tf->clone());
-//    }
-    Transformable::add_transform(tf);
-}
-
 
 void
 XILImage::run()
 {
     // This is like Transformable::run() except we need to track the bounding boxes
     QRect box{wbox_};
-    for( transform const *tf : txfs_) {
-        apply(tf);   // this is "live" and may alter wbox_
-        box |= wbox_;
-    }
+    // TODO
     mkexpose(box);
 }
 
@@ -328,10 +295,9 @@ XWindow::redraw(QRect area)
 		for( XILImage &x : ximgs_ )
 			if(x.intersects(area))
 				x.render();
-	}
-    else std::cerr << "No paint" << std::endl;
-	qbs_.endPaint();
-	qbs_.flush(area, this);
+        qbs_.endPaint();
+        qbs_.flush(area, this);
+	} else std::cerr << "No paint" << std::endl;
 }
 
 
@@ -358,6 +324,7 @@ void
 XWindow::mousePressEvent(QMouseEvent *ev)
 {
 	XILImage *w = img_at(ev->globalPos());
+#if 0
 	if(!w) {
         // XXX temporary hack
         std::ofstream fred("data");
@@ -369,11 +336,12 @@ XWindow::mousePressEvent(QMouseEvent *ev)
         std::for_each(ximgs_.begin(),ximgs_.end(),
                       [&oa](XILImage  &xim)
                       {
-                          workflow &w = xim.orig_->txfs_;
+                          transform &w = xim.orig_->txfs_;
                           oa << w;
                       });
         return;
     }
+#endif
 	w->mousePressEvent(ev);
 	QWindow::mousePressEvent(ev);
 }

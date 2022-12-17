@@ -5,7 +5,7 @@ TODO
   - Switch image within a XILWindow
 - Zoom for XILWindow should be factored out as a transform?
   - Similarly, move could/should be stored as a transform
-- Consider reordering transforms in a workflow
+- Consider reordering transforms in a transform
   - Swapping transforms can alter them (eg swapping zoom and crop)
   - Multiple move transforms can be merged into one (in principle)
   - Maybe switch to float coordinates instead of integer

@@ -1,83 +1,99 @@
-#include "transform.hh"
 #include "decor.hh"
 #include "image.hh"
+#include "transform.hh"
+
 #include <algorithm>
 #include <iterator>
 #include <QPixmap>
 #include <iostream>
 
 
-/* Defined in common.hh
- * A workflow is implemented by, quite simply, applying one transform at a time, to *this
- */
 
-workflow::~workflow()
+struct transform::transform_t {
+    // Starting from a new image in upper left (0,0) transformations are applied in the following order
+    QRect crop_;
+    float zoom_;
+    QPoint move_;
+
+    constexpr transform_t() noexcept : crop_(), zoom_(1.0), move_(0, 0) {}
+
+    // void reset() noexcept;
+    /** Zoom to absolute zoom factor */
+    void zoom_to(float);
+    /** Move top left corner to global coordinate (in main window) */
+    void move_to(QPoint);
+    /** Crop to global coordinates */
+    void crop(QRect);
+};
+
+void
+transform::transform_t::crop(QRect q)
 {
-    //std::for_each(w_.begin(), w_.end(), [](transform const *p) { delete p; });
-    w_.clear();
+
+}
+
+void transform::transform_t::zoom_to(float) {
+
+}
+
+void transform::transform_t::move_to(QPoint) {
+
+}
+
+
+transform::transform() : impl_(new transform_t)
+{
+}
+
+
+transform &transform::operator=(const transform &other) {
+    if(this != &other) {
+        *impl_ = *other.impl_;
+    }
+    return *this;
+}
+
+
+transform::~transform()
+{
+    delete impl_;
+    impl_ = nullptr;
 }
 
 
 std::ostream &
-operator<<(std::ostream &os, workflow const &wf)
+operator<<(std::ostream &os, transform const &wf)
 {
-    os << '[';
-    auto const end = wf.w_.cend();
-    auto cur = wf.w_.cbegin();
-    if(cur != end) {
-        for (;;) {
-            os << **cur;
-            if (++cur == end)
-                break;
-            os << ',';
-        }
-    }
-    os << ']' << std::endl;
+    auto const crop{wf.impl_->crop_};
+    os << "[C(" << crop.x() << ',' << crop.y() << ';'
+            << crop.width() << ',' << crop.height() << "),Z("
+       << wf.impl_->zoom_ << "),M("
+       << wf.impl_->move_.x() << ',' << wf.impl_->move_.y() << ")]\n";
     return os;
 }
 
-
-void
-workflow::add(transform *t)
+void transform::crop(QRect crop) noexcept
 {
-    if(!w_.empty()) {
-        switch (t->type()) {
-            case transform::transform_id::TX_NOP:
-                break;
-            case transform::transform_id::TX_CROP:
-                break;
-            case transform::transform_id::TX_ZOOM_TO:
-                // Because zoom is absolute, it replaces all previous instances
-                remove_type(transform::transform_id::TX_ZOOM_TO);
-                w_.push_front(t);
-                return;
-            case transform::transform_id::TX_MOVE_TO:
-                remove_type(transform::transform_id::TX_MOVE_TO);
-                // Place move_to first in list after the zoom
-                auto q{w_.begin()};
-                if (!w_.empty() && (*q)->type() == transform::transform_id::TX_ZOOM_TO)
-                    std::advance(q, 1);
-                w_.insert(q, t);
-                return;
-        }
-    }
-    w_.push_back(t);
+    impl_->crop_.adjust(crop.x(), crop.y(), 0, 0);
+    impl_->crop_.setSize(crop.size());
+}
+
+void transform::move_to(QPoint p) noexcept
+{
+    impl_->move_ = p;
+}
+
+void transform::zoom_to(float g) noexcept
+{
+    impl_->zoom_ = g;
+}
+
+float transform::get_zoom() const noexcept
+{
+    return impl_->zoom_;
 }
 
 
-void
-workflow::remove_type(transform::transform_id type, void (*cb)(const transform *))
-{
-    auto const the_end = w_.end();
-    auto q = w_.begin();
-    while( q != the_end ) {
-        if ((*q)->type() == type) {
-            if (cb) cb(*q);
-            q = w_.erase(q);
-        } else
-            ++q;
-    }
-}
 
 
 Transformable::Transformable(const ImageFile &fn) : txfs_(), img_(), wbox_()
@@ -87,193 +103,68 @@ Transformable::Transformable(const ImageFile &fn) : txfs_(), img_(), wbox_()
         throw FileNotFound(path);
     // XXX for now, all new transformable start at global upper left
     wbox_ = QRect(QPoint(0,0), img_.size());
-    // TODO: restore workflow associated with ImageFile and run it
+    // TODO: restore transform associated with ImageFile and run it
 }
 
 
 void
 Transformable::add_from_decorator(const XILDecorator &dec)
 {
-    transform *tf{dec.to_transform()};
-    add_transform(tf);
+    // FIXME
+//    transform *tf{dec.to_transform()};
+//    add_transform(tf);
 }
 
-
-void Transformable::apply(transform const *tf)
-{
-    wbox_ = tf->apply(*this, img_.rect(), img_);
-}
 
 
 void
 Transformable::run()
 {
-    std::for_each(txfs_.cbegin(), txfs_.cend(),
-                  [this](transform const *tf) { apply(tf); });
+    // FIXME
 }
 
 
-void Transformable::moveto(QPoint point)
+QRect Transformable::move_to(QPoint point)
 {
+    QRect oldbox{wbox_};
     wbox_.setTopLeft(point);
+    txfs_.move_to(point);
+    return oldbox | wbox_;
 }
 
-
-void Transformable::add_transform(transform *tf)
+QRect Transformable::zoom_to(float g)
 {
-    //apply(tf);   // must apply first since add hands over ownership
-    txfs_.add(tf);
-}
-
-
-void
-transform::merge(transform *other)
-{
-    // default merge (of transforms of the same type) is to become the second one
-    // (which is then discarded)
-    copy_from(*other);
-}
-
-
-std::ostream &
-operator<<(std::ostream &os, transform const &tf)
-{
-    tf.print(os);
-    return os;
-}
-
-
-void transform::print(std::ostream &os) const
-{
-    os << "BASE()";
-}
-
-
-transform *
-tf_zoom_to::clone() const
-{
-    tf_zoom_to *z = new tf_zoom_to();
-    z->zoom_ = zoom_;
-    return z;
-}
-
-
-void
-tf_zoom_to::copy_from(const transform &other)
-{
-    if(other.type() != transform::transform_id::TX_ZOOM_TO)
-        throw bad_transform();
-    zoom_ = dynamic_cast<tf_zoom_to const &>(other).zoom_;
-}
-
-
-QRect
-tf_zoom_to::apply(Transformable &owner, QRect bbox, QPixmap &img) const
-{
-    owner.workCopy();
-    // Resize around focus point, or centre?
-//	QPoint focus{ c.isNull() ? img_.rect().center() : c };
-    QPoint focus{ img.rect().center() };
-
-#if 0
-    // Target size
-    QSize size{ bbox.size() };
-    size.setHeight( size.height() * zoom_ + 0.99f );
-    size.setWidth( size.width() * zoom_ + 0.99f );
-    QRect oldbox = bbox;
-    img = img.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    bbox.setSize( img.size() );
-    bbox.moveCenter(focus);
-#endif
-
-    QSize target{bbox.size()};
-    target.setHeight(target.height() * zoom_ + 0.99f );
-    target.setWidth(target.width() * zoom_ + 0.99f );
-    img.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    QRect oldbox{wbox_};
+    QSize target{wbox_.size()};
+    target.setHeight(target.height() * g + 0.99f );
+    target.setWidth(target.width() * g + 0.99f );
+    img_.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     // keep the upper left corner in place for now
-    bbox.setSize(target);
-    return bbox;
+    wbox_.setSize(target);
+    // One box will be larger than the other depending on whether we zoom in or out
+    return oldbox | wbox_;
+}
+
+QRect Transformable::crop(QRect c)
+{
+    QRect oldbox{wbox_};
+    // crop the current image
+    wbox_.adjust(c.x(), c.y(), 0, 0);
+    img_ = img_.copy(c);
+    // Update the transform by unzooming the current crop instructions
+    auto z = txfs_.get_zoom();
+    c.setSize(c.size() / z);
+    // topleft is local - relative to the current image
+    c.setTopLeft(c.topLeft() / z);
+    txfs_.crop(c);
+    // Since we crop within the image oldbox should always be the larger
+    return oldbox;
 }
 
 
-void
-tf_zoom_to::print(std::ostream &os) const
+void Transformable::copy_from(const Transformable &orig)
 {
-    os << "ZOOM(" << zoom_ << ')';
-}
-
-
-QRect tf_move_to::apply(Transformable &owner, QRect bbox, QPixmap &img) const
-{
-    bbox.setTopLeft(QPoint(x_,y_));
-    return transform::apply(owner, bbox, img);
-}
-
-
-transform *
-tf_move_to::clone() const
-{
-    tf_move_to *mv = new tf_move_to();
-    mv->x_ = x_;
-    mv->y_ = y_;
-    return mv;
-}
-
-
-void tf_move_to::copy_from(const transform &other)
-{
-    if(other.type() != transform::transform_id::TX_MOVE_TO)
-        throw bad_transform();
-    tf_move_to const &o = dynamic_cast<tf_move_to const &>(other);
-    x_ = o.x_;
-    y_ = o.y_;
-}
-
-
-void
-tf_move_to::print(std::ostream &os) const
-{
-    os << "MOVE(" << x_ << ',' << y_ << ')';
-}
-
-
-transform *
-tf_crop::clone() const
-{
-    tf_crop *c = new tf_crop();
-    c->x_ = x_; c->y_ = y_; c->w_ = w_; c->h_ = h_;
-    return c;
-}
-
-
-void
-tf_crop::copy_from(const transform &other)
-{
-    if(other.type() != transform::transform_id::TX_CROP)
-        throw bad_transform();
-    tf_crop const &o = dynamic_cast<tf_crop const &>(other);
-    x_ = o.x_; y_ = o.y_;
-    w_ = o.w_; h_ = o.h_;
-}
-
-
-QRect tf_crop::apply(Transformable &owner, QRect bbox, QPixmap &img) const
-{
-    QRect box(x_, y_, w_, h_);
-    img = img.copy(box);
-    std::cerr << "crop " << x_ << ' ' << y_ << ' ' << w_ << ' ' << h_ << std::endl;
-    // Image is moved to where the crop rectangle is (but in global coords)
-    bbox.adjust(x_, y_, 0, 0);
-    owner.moveto(bbox.topLeft());
-    bbox.setWidth(box.width());
-    bbox.setHeight(box.height());
-    // Return global coordinates
-    return transform::apply(owner, bbox, img);
-}
-
-
-void
-tf_crop::print(std::ostream &os) const
-{
-    os << "CROP(" << x_ << ' ' << y_ << ' ' << w_ << ' ' << h_ << ')';
+    img_ = orig.img_.copy();
+    wbox_ = orig.wbox_;
+    txfs_ = orig.txfs_;
 }

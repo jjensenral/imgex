@@ -15,9 +15,9 @@ Transform <|-- CropTransform
 Transform <|-- ZoomTransform
 XILDecorator <|-- CropDecorator
 CropDecorator ..> CropTransform
-workflow "0..1" o--> "*" Transform
+transform "0..1" o--> "*" Transform
 Transformable <|-- XILImage : is a
-Transformable *--> workflow : has a
+Transformable *--> transform : has a
 ```
 
 This may look slightly complicated partly due to the way Mermaid lays it out but the gist of it is:
@@ -32,6 +32,6 @@ This may look slightly complicated partly due to the way Mermaid lays it out but
 - XILDecorator adds temporary design to a XILImage
   - This design can be converted to a (permanent) Transform (eg crop), in a factory pattern
   - Transforms can also be generated independently
-  - Transforms are collected together in a workflow
+  - Transforms are collected together in a transform
   - Most transforms are stored with the Image, as they would be image specific
     - E.g. it is assumed that the image will be cropped the same way

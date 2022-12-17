@@ -14,7 +14,7 @@
 #include <QRect>
 
 
-#include "common.hh"
+#include "transform.hh"
 #include "session.hh"
 #include "image.hh"
 
@@ -60,7 +60,7 @@ public:
 
     /** Some decorators present a transform visually.
      * By default a NOP transform is returned. */
-    virtual transform *to_transform() const { return new transform(); }
+//    virtual transform *to_transform() const { return new transform(); }
 
 	/* Give XILImage permission to add owner */
 	friend class XILImage;
@@ -108,8 +108,6 @@ class XILImage final : public QWindow, public Transformable {
 	 * \return true if event handled */
 	bool decor_event(QEvent &);
 
-    void add_transform(transform *) override;
-
 #if 0
 	/** Move window */
 	void moveto(int x, int y) noexcept
@@ -134,9 +132,9 @@ public:
     XILImage &operator=(XILImage &&) = delete;
 
     /** (Re)copy orig to working copy */
-    void workCopy() override;
+    void copy_from(Transformable const &orig) override;
 
-    /** (Re)run workflow on current image */
+    /** (Re)run transform on current image */
     void run() override;
 
     /** Call clear */
@@ -171,7 +169,6 @@ public:
 		decors_.push_back(dec);
 	}
 
-    virtual void apply(transform const *tf) override;
 	friend class XWindow;
 };
 

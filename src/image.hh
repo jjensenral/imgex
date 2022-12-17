@@ -5,7 +5,7 @@
 #include <set>
 #include <QString>
 #include <QPixmap>
-#include "common.hh"
+#include "transform.hh"
 
 
 /** ImageFile represents a file as stored on physical media;
@@ -34,7 +34,7 @@ public:
 class Image final : public Transformable {
 	// TODO: checksum
 	ImageFile const imgf_;
-    workflow wf_;
+    transform wf_;
 public:
 	Image( ImageFile const &imgf );
 	virtual ~Image();
@@ -47,13 +47,7 @@ public:
     [[nodiscard]] const QPixmap getImage() const { return img_; }
 	/** Returns a filename (basename) identifying the file */
 	[[nodiscard]] QString getFilename() const noexcept;
-    /** Add a transform to the workflow for this image, taking ownership */
-    virtual void apply(transform *tf) {
-        wf_.add(tf);
-        Transformable::apply(tf);
-    }
-    // XXX temporary hack: nothing gets added to the Image
-    void add_transform(transform *tf) override {}
+    /** Add a transform to the transform for this image, taking ownership */
 };
 
 

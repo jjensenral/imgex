@@ -184,6 +184,7 @@ XILImage::wheelEvent(QWheelEvent *ev)
 //    resize(ev->globalPosition().toPoint(), resize_on_zoom_);
 
 	mkexpose(zoom_to(zoom_));
+    std::cerr << txfs_;
 	QWindow::wheelEvent(ev);
 }
 

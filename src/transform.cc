@@ -9,94 +9,20 @@
 
 
 
-struct transform::transform_t {
-    // Starting from a new image in upper left (0,0) transformations are applied in the following order
-    QRect crop_;
-    float zoom_;
-    QPoint move_;
-
-    constexpr transform_t() noexcept : crop_(), zoom_(1.0), move_(0, 0) {}
-
-    // void reset() noexcept;
-    /** Zoom to absolute zoom factor */
-    void zoom_to(float);
-    /** Move top left corner to global coordinate (in main window) */
-    void move_to(QPoint);
-    /** Crop to global coordinates */
-    void crop(QRect);
-};
-
-void
-transform::transform_t::crop(QRect q)
-{
-
-}
-
-void transform::transform_t::zoom_to(float) {
-
-}
-
-void transform::transform_t::move_to(QPoint) {
-
-}
-
-
-transform::transform() : impl_(new transform_t)
-{
-}
-
-
-transform &transform::operator=(const transform &other) {
-    if(this != &other) {
-        *impl_ = *other.impl_;
-    }
-    return *this;
-}
-
-
-transform::~transform()
-{
-    delete impl_;
-    impl_ = nullptr;
-}
-
-
 std::ostream &
-operator<<(std::ostream &os, transform const &wf)
+operator<<(std::ostream &os, Transformable::transform const &wf)
 {
-    auto const crop{wf.impl_->crop_};
+    auto const crop{wf.crop_};
     os << "[C(" << crop.x() << ',' << crop.y() << ';'
             << crop.width() << ',' << crop.height() << "),Z("
-       << wf.impl_->zoom_ << "),M("
-       << wf.impl_->move_.x() << ',' << wf.impl_->move_.y() << ")]\n";
+       << wf.zoom_ << "),M("
+       << wf.move_.x() << ',' << wf.move_.y() << ")]\n";
     return os;
 }
 
-void transform::crop(QRect crop) noexcept
-{
-    impl_->crop_.adjust(crop.x(), crop.y(), 0, 0);
-    impl_->crop_.setSize(crop.size());
-}
-
-void transform::move_to(QPoint p) noexcept
-{
-    impl_->move_ = p;
-}
-
-void transform::zoom_to(float g) noexcept
-{
-    impl_->zoom_ = g;
-}
-
-float transform::get_zoom() const noexcept
-{
-    return impl_->zoom_;
-}
 
 
-
-
-Transformable::Transformable(const ImageFile &fn) : txfs_(), img_(), wbox_()
+Transformable::Transformable(const ImageFile &fn) : img_(), cache_(), wbox_(), txfs_()
 {
     QString path{fn.getPath()};
     if(!img_.load(path))
@@ -128,35 +54,45 @@ QRect Transformable::move_to(QPoint point)
 {
     QRect oldbox{wbox_};
     wbox_.setTopLeft(point);
-    txfs_.move_to(point);
+    txfs_.move_ = point;
     return oldbox | wbox_;
 }
 
 QRect Transformable::zoom_to(float g)
 {
-    QRect oldbox{wbox_};
-    QSize target{wbox_.size()};
+    txfs_.zoom_ = g;
+    if(cache_.isNull())
+        cache_ = img_.copy();
+    QSize target{cache_.size()};
     target.setHeight(target.height() * g + 0.99f );
     target.setWidth(target.width() * g + 0.99f );
-    img_.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    // keep the upper left corner in place for now
-    wbox_.setSize(target);
+    img_ = cache_.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+
+    QRect oldbox{wbox_};
+    // FIXME allow zooming around centre or mouse point
+
+    wbox_.setSize(img_.size());
     // One box will be larger than the other depending on whether we zoom in or out
     return oldbox | wbox_;
 }
 
 QRect Transformable::crop(QRect c)
 {
+    txfs_.crop_.adjust(c.x(), c.y(), 0, 0);
+    txfs_.crop_.setSize(c.size());
+    img_ = img_.copy(c);
+    cache_ = QPixmap();
+
     QRect oldbox{wbox_};
     // crop the current image
     wbox_.adjust(c.x(), c.y(), 0, 0);
     img_ = img_.copy(c);
     // Update the transform by unzooming the current crop instructions
-    auto z = txfs_.get_zoom();
+    auto z = txfs_.zoom_;
     c.setSize(c.size() / z);
     // topleft is local - relative to the current image
     c.setTopLeft(c.topLeft() / z);
-    txfs_.crop(c);
+    txfs_.crop_ = c;
     // Since we crop within the image oldbox should always be the larger
     return oldbox;
 }

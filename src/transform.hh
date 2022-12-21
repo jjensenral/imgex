@@ -1,5 +1,5 @@
-#ifndef __IMGEX_COMMON_H
-#define __IMGEX_COMMON_H
+#ifndef __IMGEX_TRANSFORM_H
+#define __IMGEX_TRANSFORM_H
 
 
 #include <iosfwd>
@@ -24,39 +24,6 @@ public:
 };
 
 
-/** transform is basically a list of transforms.
- * We have to store pointer to transforms (of some description) or we will slice them.
- */
-class transform final {
-private:
-    struct transform_t;
-    struct transform_t *impl_;
-    friend class boost::serialization::access;
-
-    template<class Archive>
-    void serialize(Archive &ar, const unsigned int version);
-
-public:
-	transform();
-	~transform();
-    transform(transform const &) = delete;
-    transform &operator=(transform const &);
-    transform(transform &&) = default;
-    transform &operator=(transform &&) = default;
-
-    //** Set move transform to absolute (parent window) coordinate
-    void move_to(QPoint) noexcept;
-    //** Set (absolute) zoom level
-    void zoom_to(float) noexcept;
-    //** Crop takes relative coordinates (within local pixmap)
-    void crop(QRect) noexcept;
-
-    friend std::ostream &operator<<(std::ostream &, transform const &);
-
-    float get_zoom() const noexcept;
-};
-
-
 // The XILDecorator base class is defined in xwin.hh
 // derived classes in decor.hh
 class XILDecorator;
@@ -68,6 +35,7 @@ class ImageFile;
 class XWindow;
 class Transformable {
 private:
+
     // XXX temporary hack
     friend class XWindow;
 public:
@@ -75,8 +43,12 @@ public:
     typedef QRect xwParentBox;
 
     Transformable(ImageFile const &fn);
-    // img is value copyable
-    Transformable(QPixmap img) : img_(img), wbox_(img.rect()), txfs_() {}
+
+    /** Create a base Transformable
+     * Pixmaps are value copyable
+     * @param img base pixmap (not null)
+     */
+    Transformable(QPixmap img) : img_(img), cache_(), wbox_(img.rect()), txfs_() {}
 	virtual ~Transformable() = default;
     // not inline functions defined in transform.cc
     void add_from_decorator(XILDecorator const &dec);
@@ -105,13 +77,31 @@ public:
 protected:
     /** The image to be transformed */
     QPixmap img_;
+    /** Temporary cache of cropped image before zoom is applied
+     * Needed tp ensure we don't lose zoom resolution and to avoid redoing the crop.
+     * Note we can never uncrop from within this class itself
+     */
+     QPixmap cache_;
     /** placement on main window; width and height equivalent to the image size times scale */
     xwParentBox wbox_;
 
-	/** Serialise */
+    struct transform {
+        // Starting from a new image in upper left (0,0) transformations are applied in the following order
+        // crop in pixmap-local coordinates (same as global as pre-transform images start top left (0,0)
+        QRect crop_;
+        // then zoom to absolute value keeping top left fixed
+        float zoom_;
+        // and finally move top left point to a new location
+        QPoint move_;
+
+        transform() : crop_(), zoom_(1.0), move_(0,0) {}
+
+    } txfs_;
+
+    friend std::ostream &operator<<(std::ostream &, transform const &);
+    /** Serialise */
 
 
-    transform txfs_;
 };
 
 

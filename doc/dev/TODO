@@ -3,15 +3,17 @@ TODO
   - Persistence and sessions
   - File selection
   - Switch image within a XILWindow
-- Zoom for XILWindow should be factored out as a transform?
-  - Similarly, move could/should be stored as a transform
-- Consider reordering transforms in a transform
-  - Swapping transforms can alter them (eg swapping zoom and crop)
-  - Multiple move transforms can be merged into one (in principle)
-  - Maybe switch to float coordinates instead of integer
+- Maybe switch to float coordinates (QRectF) instead of integer (QRect)
 - Move XILWindows from one XWindow to another (it can't just be moved with the mouse)
 - ImageFile should check whether the file exists when it's created
 - Some of the event handled logic needs tidying up
 
 BUGS
 - If zooming a window with an active crop, the crop does not change its size
+
+DONE (OR NO LONGER NEEDED)
+- Zoom for XILWindow should be factored out as a transform?
+  - Similarly, move could/should be stored as a transform
+- Consider reordering transforms in a transform
+  - Swapping transforms can alter them (eg swapping zoom and crop)
+  - Multiple move transforms can be merged into one (in principle)

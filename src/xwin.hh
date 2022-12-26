@@ -95,10 +95,7 @@ class XILImage final : public QWindow, public Transformable {
 
 	QString name_;
 
-	/** Bounding box in parent's coordinates */
-	[[nodiscard]] xwParentBox parent_box() const;
-
-	/** Storage for decorators (overlays) */
+    /** Storage for decorators (overlays) */
 	std::list<XILDecorator *> decors_;
 
 	/** Render the image in the window */
@@ -117,11 +114,6 @@ class XILImage final : public QWindow, public Transformable {
 	}
 #endif
 
-	/** Resize window and image to size relative to original image
-	 * \param oldbox the pre-resize box; if null, the current box is assumed
-	*/
-    void resize(QRect const &) override;
-
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
 	~XILImage() = default;
@@ -133,6 +125,8 @@ public:
 
     /** (Re)copy orig to working copy */
     void copy_from(Transformable const &orig) override;
+
+    QRect zoom_to(float) override;
 
     /** (Re)run transform on current image */
     void run() override;

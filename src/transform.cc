@@ -53,9 +53,10 @@ Transformable::run()
 QRect Transformable::move_to(QPoint point)
 {
     QRect oldbox{wbox_};
-    wbox_.setTopLeft(point);
+    QRect newbox{point, oldbox.size()};
     txfs_.move_ = point;
-    return oldbox | wbox_;
+    wbox_ = newbox;
+    return oldbox | newbox;
 }
 
 QRect Transformable::zoom_to(float g)
@@ -63,15 +64,15 @@ QRect Transformable::zoom_to(float g)
     txfs_.zoom_ = g;
     if(cache_.isNull())
         cache_ = img_.copy();
-    QSize target{cache_.size()};
-    target.setHeight(target.height() * g + 0.99f );
-    target.setWidth(target.width() * g + 0.99f );
+    QSize target = zoom_box(g);
     img_ = cache_.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 
     QRect oldbox{wbox_};
     // FIXME allow zooming around centre or mouse point
-
-    wbox_.setSize(img_.size());
+    QSize offset = (target - wbox_.size())/2;
+    wbox_.setSize(target);
+    // As the image grows/shrinks, shift top left accordingly
+    //move_to(QPoint(wbox_.x()+offset.width(), wbox_.y()+offset.height()));
     // One box will be larger than the other depending on whether we zoom in or out
     return oldbox | wbox_;
 }

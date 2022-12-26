@@ -15,7 +15,7 @@
 #include <QWheelEvent>
 #include <iostream>
 #include <fstream>
-
+#include <fmt/core.h>
 
 XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name) : QWindow(&xw), Transformable(img->getImage()),
                                                                          // Note we take ownership of the Image and img is invalid from now on
@@ -47,12 +47,13 @@ XILImage::render()
 {
 	if(!isExposed())
 		return;
+    // local coordinates
 	QRect reg{0, 0, width(), height()};
 	canvas_.beginPaint(reg);
 	QPaintDevice *pd = canvas_.paintDevice();
 	if(!pd) {
 		qWarning("Unable to get paint device");
-		canvas_.endPaint(); // XXX this may segfault? documentation is unclear
+		// canvas_.endPaint(); - this will segfault though documentation is unclear
 		return;
 	}
 	QPainter p(pd);
@@ -64,17 +65,6 @@ XILImage::render()
 	p.end();
 	canvas_.endPaint();				// also frees pd
 	canvas_.flush(reg, this);
-}
-
-
-void
-XILImage::resize(QRect const &w)
-{
-    QRect oldbox(w.isNull() ? wbox_ : w);
-	QWindow::resize(wbox_.size());
-	canvas_.resize(wbox_.size());
-    img_ = orig_->getImage().scaled(wbox_.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-	mkexpose( oldbox | wbox_ );
 }
 
 
@@ -99,8 +89,7 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 		track_ = true;
 	    break;
 	case Qt::MiddleButton:
-		zoom_ = 1.0f;
-            resize(QRect());
+            zoom_to(1.0);
 		break;
 	case Qt::RightButton:
         // XXX for now, just start or end the crop process
@@ -145,11 +134,11 @@ XILImage::mouseMoveEvent(QMouseEvent *ev)
         return;
 	// Only move if we are in track mode and docked with the main window
 	if(track_) {
-		xwParentBox from = parent_box();
+        xwParentBox from = wbox_;
 		QPoint q{ev->globalPos()};
 		QPoint delta{ q-oldq_ };
 		oldq_ = q;
-		QPoint newpos{ this->position() + delta };
+		QPoint newpos{position() + delta };
 		xwParentBox to{ newpos, from.size() };
 		wbox_ = to;
 		if(isTopLevel()) {
@@ -157,7 +146,7 @@ XILImage::mouseMoveEvent(QMouseEvent *ev)
 			setPosition(newpos);
 		} else {
 			// Current mouse position relative to parent window
-			q -= this->parent()->position();
+			q -= parent()->position();
 		}
 		// Move the window to the new location
 		setPosition(newpos);
@@ -171,7 +160,7 @@ void
 XILImage::wheelEvent(QWheelEvent *ev)
 {
 	// Area affected
-	xwParentBox area = parent_box();
+    xwParentBox area = wbox_;
 
 	// Wheel forward is zoom in (ie enlarge)
 	if(ev->angleDelta().y() > 0)
@@ -235,14 +224,6 @@ XILImage::decor_event(QEvent &qev)
 }
 
 
-XILImage::xwParentBox
-XILImage::parent_box() const
-{
-    return wbox_;
-}
-
-
-
 void
 XILImage::run()
 {
@@ -250,6 +231,14 @@ XILImage::run()
     QRect box{wbox_};
     // TODO
     mkexpose(box);
+}
+
+QRect XILImage::zoom_to(float g) {
+    // Need to resize canvas before we call zoom
+    QSize q = zoom_box(g);
+    canvas_.resize(q);
+    QWindow::resize(q);
+    return Transformable::zoom_to(g);
 }
 
 
@@ -286,7 +275,7 @@ XWindow::redraw(QRect area)
 		area = window;
 	else
 		area &= window;
-    //std::cerr << "REDRAW " << area.width() << ',' << area.height() << std::endl;
+    fmt::print(stderr, "REDRAW({: >3d} {: >3d} {: >3d} {: >3d})\n", area.x(), area.y(), area.width(), area.height());
 	qbs_.beginPaint(area);
 	QPaintDevice *dev = qbs_.paintDevice();
 	if(dev) {

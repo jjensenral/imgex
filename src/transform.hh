@@ -68,12 +68,6 @@ public:
     /** Crop to relative box (in local pixmap coordinates) */
     virtual QRect crop(QRect);
 
-
-    /** Resize the image to wbox
-     * Does not scale the image (the zoom transform does that)
-     * \param oldbox pre-resize box, if null the current size is used */
-    virtual void resize(QRect const &oldbox) {};
-
 protected:
     /** The image to be transformed */
     QPixmap img_;
@@ -84,6 +78,14 @@ protected:
      QPixmap cache_;
     /** placement on main window; width and height equivalent to the image size times scale */
     xwParentBox wbox_;
+
+    QSize zoom_box(float g)
+    {
+        QSize target{cache_.isNull() ? img_.size() : cache_.size()};
+        target.setHeight(target.height() * g + 0.99f );
+        target.setWidth(target.width() * g + 0.99f );
+        return target;
+    }
 
     struct transform {
         // Starting from a new image in upper left (0,0) transformations are applied in the following order

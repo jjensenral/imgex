@@ -23,6 +23,8 @@ protected:
     virtual event_status_t mMove(QMouseEvent const &);
 public:
     virtual event_status_t handleEvent(QEvent &) override;
+
+    void to_transform(Transformable &image, Transformable::transform &transform) const override;
 };
 
 
@@ -30,20 +32,22 @@ public:
 /** Crop decorator */
 class XILCropDecorator : public XILMouseEventDecorator {
 private:
-    /** Area to crop */
+    /** Area to crop in local (image) coordinates */
     QRect crop_;
     /** Track which corner we are moving (if any) */
     enum class corner_t { NONE, NW, NE, SW, SE } corner_;
+protected:
+    event_status_t mPress(QMouseEvent const &) override;
+    event_status_t mMove(QMouseEvent const &) override;
+    event_status_t mRelease(QMouseEvent const &) override;
+
 public:
     virtual event_status_t handleEvent(QEvent &) override;
 
     virtual void render(QPainter &qp) override;
 
-    //virtual transform *to_transform() const override;
+    void to_transform(Transformable &image, Transformable::transform &transform) const override;
 
-    event_status_t mPress(QMouseEvent const &) override;
-    event_status_t mMove(QMouseEvent const &) override;
-    event_status_t mRelease(QMouseEvent const &) override;
 };
 
 /** Simple decorator which draws a border around the image */
@@ -57,6 +61,8 @@ public:
 	 * If created with a null box, will use its owner's border */
 	BorderDecorator(QRect qr, QColor qc) : box_(qr), col_(qc) {}
 	virtual void render(QPainter &) override;
+
+    void to_transform(Transformable &image, Transformable::transform &transform) const override;
 };
 
 

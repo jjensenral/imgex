@@ -86,6 +86,11 @@ XILMouseEventDecorator::mMove(QMouseEvent const &ev)
     return event_status_t::EV_NOP;
 }
 
+void
+XILMouseEventDecorator::to_transform(Transformable &, Transformable::transform &) const
+{
+}
+
 
 XILDecorator::event_status_t
 XILCropDecorator::handleEvent(QEvent &qev) {
@@ -167,6 +172,11 @@ XILCropDecorator::render(QPainter &qp)
     qp.restore();
 }
 
+void
+XILCropDecorator::to_transform(Transformable &image, Transformable::transform &) const
+{
+    image.crop(crop_);
+}
 
 
 void
@@ -184,4 +194,9 @@ BorderDecorator::render(QPainter &qp)
 	qp.setBackgroundMode(Qt::TransparentMode);
 	qp.drawRect(box);
 	qp.restore();
+}
+
+void
+BorderDecorator::to_transform(Transformable &image, Transformable::transform &transform) const
+{
 }

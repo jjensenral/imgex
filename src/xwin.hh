@@ -60,7 +60,7 @@ public:
 
     /** Some decorators present a transform visually.
      * By default a NOP transform is returned. */
-//    virtual transform *to_transform() const { return new transform(); }
+    virtual void to_transform(Transformable &, Transformable::transform &) const = 0;
 
 	/* Give XILImage permission to add owner */
 	friend class XILImage;
@@ -127,6 +127,10 @@ public:
     void copy_from(Transformable const &orig) override;
 
     QRect zoom_to(float) override;
+
+    QRect crop(QRect rect) override;
+
+    QRect move_to(QPoint point) override;
 
     /** (Re)run transform on current image */
     void run() override;

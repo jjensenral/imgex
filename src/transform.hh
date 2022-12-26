@@ -59,14 +59,31 @@ public:
     /** reset working copy of image to its Image */
     virtual void copy_from(Transformable const &orig);
 
-    /** Move to new topleft global position */
+    /** Move to new topleft global position
+     * Returns the global rectangle to redraw */
     virtual QRect move_to(QPoint point);
 
-    /** Zoom to (absolute value) */
+    /** Zoom to (absolute value)
+     * Returns the global rectangle to redraw */
     virtual QRect zoom_to(float);
 
-    /** Crop to relative box (in local pixmap coordinates) */
+    /** Crop to relative box (in local pixmap coordinates)
+     * Returns the global rectangle to redraw
+     * Note the return value is in global coordinates like the other transform functions */
     virtual QRect crop(QRect);
+
+    struct transform {
+        // Starting from a new image in upper left (0,0) transformations are applied in the following order
+        // crop in pixmap-local coordinates (same as global as pre-transform images start top left (0,0)
+        QRect crop_;
+        // then zoom to absolute value keeping top left fixed
+        float zoom_;
+        // and finally move top left point to a new location
+        QPoint move_;
+
+        transform() : crop_(), zoom_(1.0), move_(0,0) {}
+
+    };
 
 protected:
     /** The image to be transformed */
@@ -87,18 +104,7 @@ protected:
         return target;
     }
 
-    struct transform {
-        // Starting from a new image in upper left (0,0) transformations are applied in the following order
-        // crop in pixmap-local coordinates (same as global as pre-transform images start top left (0,0)
-        QRect crop_;
-        // then zoom to absolute value keeping top left fixed
-        float zoom_;
-        // and finally move top left point to a new location
-        QPoint move_;
-
-        transform() : crop_(), zoom_(1.0), move_(0,0) {}
-
-    } txfs_;
+    struct transform txfs_;
 
     friend std::ostream &operator<<(std::ostream &, transform const &);
     /** Serialise */

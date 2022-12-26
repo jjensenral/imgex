@@ -38,6 +38,7 @@ XILImage::copy_from(Transformable const &orig)
 {
     QRect oldbox{wbox_};
     Transformable::copy_from(orig);
+    zoom_ = 1.0;
     mkexpose(oldbox | wbox_);
 }
 
@@ -90,6 +91,7 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 	    break;
 	case Qt::MiddleButton:
             zoom_to(1.0);
+            cache_ = QPixmap(); // Resetting size invalidates cache
 		break;
 	case Qt::RightButton:
         // XXX for now, just start or end the crop process
@@ -233,12 +235,26 @@ XILImage::run()
     mkexpose(box);
 }
 
-QRect XILImage::zoom_to(float g) {
+QRect
+XILImage::zoom_to(float g) {
     // Need to resize canvas before we call zoom
     QSize q = zoom_box(g);
     canvas_.resize(q);
     QWindow::resize(q);
     return Transformable::zoom_to(g);
+}
+
+QRect
+XILImage::crop(QRect rect) {
+    QRect q = Transformable::crop(rect);
+    canvas_.resize(q.size());
+    QWindow::resize(q.size());
+    return q;
+}
+
+QRect
+XILImage::move_to(QPoint point) {
+    return Transformable::move_to(point);
 }
 
 
@@ -275,7 +291,7 @@ XWindow::redraw(QRect area)
 		area = window;
 	else
 		area &= window;
-    fmt::print(stderr, "REDRAW({: >3d} {: >3d} {: >3d} {: >3d})\n", area.x(), area.y(), area.width(), area.height());
+    //fmt::print(stderr, "REDRAW({: >3d} {: >3d} {: >3d} {: >3d})\n", area.x(), area.y(), area.width(), area.height());
 	qbs_.beginPaint(area);
 	QPaintDevice *dev = qbs_.paintDevice();
 	if(dev) {

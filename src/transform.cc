@@ -36,9 +36,7 @@ Transformable::Transformable(const ImageFile &fn) : img_(), cache_(), wbox_(), t
 void
 Transformable::add_from_decorator(const XILDecorator &dec)
 {
-    // FIXME
-//    transform *tf{dec.to_transform()};
-//    add_transform(tf);
+    dec.to_transform(*this, txfs_);
 }
 
 
@@ -79,12 +77,13 @@ QRect Transformable::zoom_to(float g)
 
 QRect Transformable::crop(QRect c)
 {
+    // Note that c comes in local coordinates
     txfs_.crop_.adjust(c.x(), c.y(), 0, 0);
     txfs_.crop_.setSize(c.size());
     img_ = img_.copy(c);
     cache_ = QPixmap();
 
-    QRect oldbox{wbox_};
+    QRect oldbox{wbox_}; // note global coordinates (top left rel to parent window)
     // crop the current image
     wbox_.adjust(c.x(), c.y(), 0, 0);
     img_ = img_.copy(c);
@@ -104,4 +103,5 @@ void Transformable::copy_from(const Transformable &orig)
     img_ = orig.img_.copy();
     wbox_ = orig.wbox_;
     txfs_ = orig.txfs_;
+    cache_ = QPixmap();
 }

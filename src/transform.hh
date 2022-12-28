@@ -9,6 +9,7 @@
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/list.hpp>
+#include <cmath>
 
 class QString;
 
@@ -83,6 +84,7 @@ public:
 
         transform() : crop_(), zoom_(1.0), move_(0,0) {}
 
+        bool has_zoom() const noexcept { return std::fabs(zoom_-1.0f) > 1e-4; }
     };
 
 protected:

@@ -78,21 +78,25 @@ QRect Transformable::zoom_to(float g)
 QRect Transformable::crop(QRect c)
 {
     // Note that c comes in local coordinates
-    txfs_.crop_.adjust(c.x(), c.y(), 0, 0);
-    txfs_.crop_.setSize(c.size());
     img_ = img_.copy(c);
-    cache_ = QPixmap();
 
     QRect oldbox{wbox_}; // note global coordinates (top left rel to parent window)
-    // crop the current image
+    // Shift display box so the result image is in the box it was selected from
     wbox_.adjust(c.x(), c.y(), 0, 0);
-    img_ = img_.copy(c);
-    // Update the transform by unzooming the current crop instructions
-    auto z = txfs_.zoom_;
-    c.setSize(c.size() / z);
-    // topleft is local - relative to the current image
-    c.setTopLeft(c.topLeft() / z);
-    txfs_.crop_ = c;
+    wbox_.setSize(c.size());
+    // crop the current pre-zoom image as well
+    if(txfs_.has_zoom()) {
+        // Update the pre-zoomed image by unzooming the current crop instructions
+        auto z = txfs_.zoom_;
+        c.setSize(c.size() / z);
+        // topleft is local - relative to the current image
+        c.setTopLeft(c.topLeft() / z);
+        if(!cache_.isNull())
+            cache_ = cache_.copy(c);
+    }
+    txfs_.crop_.adjust(c.x(), c.y(), 0, 0);
+    txfs_.crop_.setSize(c.size());
+
     // Since we crop within the image oldbox should always be the larger
     return oldbox;
 }

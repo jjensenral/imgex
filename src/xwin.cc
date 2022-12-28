@@ -246,14 +246,21 @@ XILImage::zoom_to(float g) {
 
 QRect
 XILImage::crop(QRect rect) {
+    fmt::print(stderr, "CROP {}x{}+{}+{}\n", rect.width(), rect.height(), rect.x(), rect.y());
     QRect q = Transformable::crop(rect);
-    canvas_.resize(q.size());
-    QWindow::resize(q.size());
+    fmt::print(stderr, "RDRW {}x{}+{}+{}\n", q.width(), q.height(), q.x(), q.y());
+    fmt::print(stderr, "WBOX {}x{}+{}+{}\n", wbox_.width(), wbox_.height(), wbox_.x(), wbox_.y());
+    fmt::print(stderr, "TXFS {}x{}+{}+{}\n", txfs_.crop_.width(), txfs_.crop_.height(), txfs_.crop_.x(), txfs_.crop_.y());
+    canvas_.resize(wbox_.size());
+    QWindow::resize(wbox_.size());
+    // It is safe to ignore the return value here since we move wholly inside the larger (original) box q
+    move_to(wbox_.topLeft());
     return q;
 }
 
 QRect
 XILImage::move_to(QPoint point) {
+    QWindow::setPosition(point);
     return Transformable::move_to(point);
 }
 

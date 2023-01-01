@@ -20,6 +20,7 @@
 
 
 class XWindow;
+class QScreen;
 class XMain;
 
 
@@ -178,7 +179,7 @@ public:
  */
 class XWindow final : public QWindow {
 	/** List of images, lowest first */
-	std::list<XILImage> ximgs_;
+	std::list<std::shared_ptr<XILImage>> ximgs_;
 	/** Return a ptr to image at x,y or nullptr if there isn't one
 	 * Note this can't be const because it returns a pointer to a
 	 * non-const XILImage
@@ -187,12 +188,12 @@ class XWindow final : public QWindow {
 	/** Background */
 	QBackingStore qbs_;
  public:
-	XWindow();
-	~XWindow() noexcept;
+	XWindow(QScreen *scr = nullptr);
 	XWindow(XWindow const &) = delete;
-	XWindow(XWindow &&) = default;
+    // The move ctor is unsafe (probably) because XWindow inherits from QWindow
+	XWindow(XWindow &&);
 	XWindow &operator=(XWindow const &) = delete;
-	XWindow &operator=(XWindow &&) = default;
+	XWindow &operator=(XWindow &&);
 
 	/** Make an image in this window */
 	void mkimage(ImageFile const &, QString);

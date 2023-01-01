@@ -2,15 +2,17 @@
 #define __IMGEX_SESSION_H
 
 #include <chrono>
-
+#include <memory>
 
 typedef std::chrono::duration<int64_t> ses_time;
 
+class SessionImpl;
 
 class Session final {
  private:
     uint64_t id_;
     std::chrono::time_point<std::chrono::system_clock> time_;
+    std::unique_ptr<SessionImpl> impl_;
 
  public:
     Session();

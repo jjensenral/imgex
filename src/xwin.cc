@@ -265,25 +265,34 @@ XILImage::move_to(QPoint point) {
 }
 
 
-XWindow::XWindow() : QWindow(static_cast<QWindow *>(nullptr)), qbs_(this)
+XWindow::XWindow(QScreen *scr) : QWindow(scr), qbs_(this)
 {
-	//showMaximized();
 }
 
 
-XWindow::~XWindow()
+XWindow::XWindow(XWindow &&other) : ximgs_(other.ximgs_), qbs_(QBackingStore(this))
 {
+    fmt::print(stderr, "XWindow move is buggy\n"); // debug
+    // TODO? generate an expose since we restart with a blank backing store
 }
+
+
+#if 0
+XWindow &XWindow::operator=(XWindow &&other) {
+    ximgs_ = std::move(other.ximgs_)
+    return <#initializer#>;
+}
+#endif
 
 
 XILImage *
 XWindow::img_at(auto args...) noexcept
 {
 	// We must find the last (highest in stack) image that contains the point
-	std::reverse_iterator<std::list<XILImage>::iterator> p = ximgs_.rbegin(), q = ximgs_.rend();
+	std::reverse_iterator<std::list<std::shared_ptr<XILImage>>::iterator> p = ximgs_.rbegin(), q = ximgs_.rend();
 	// Annoyingly, std::find_if refuses to work with reverse iterator adaptors?
 	while( p != q ) {
-		if( p->contains(args) ) return &(*p);
+		if( (*p)->contains(args) ) return p->get();
 		++p;
 	}
 	return nullptr;
@@ -305,9 +314,9 @@ XWindow::redraw(QRect area)
 		QPainter qp(dev);
 		qp.fillRect(area, QColor(0,0,0));
 		qp.end();
-		for( XILImage &x : ximgs_ )
-			if(x.intersects(area))
-				x.render();
+		for( auto &x : ximgs_ )
+			if(x->intersects(area))
+				x->render();
         qbs_.endPaint();
         qbs_.flush(area, this);
 	} else std::cerr << "No paint" << std::endl;
@@ -399,5 +408,5 @@ void
 XWindow::mkimage(ImageFile const &fn, QString name)
 {
     auto img = std::make_unique<Image>(fn);
-	ximgs_.emplace_back(*this, std::move(img), name);
+	ximgs_.push_back(std::make_shared<XILImage>(*this, std::move(img), name));
 }

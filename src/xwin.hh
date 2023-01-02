@@ -191,9 +191,9 @@ class XWindow final : public QWindow {
 	XWindow(QScreen *scr = nullptr);
 	XWindow(XWindow const &) = delete;
     // The move ctor is unsafe (probably) because XWindow inherits from QWindow
-	XWindow(XWindow &&);
+	XWindow(XWindow &&) = delete;
 	XWindow &operator=(XWindow const &) = delete;
-	XWindow &operator=(XWindow &&);
+	XWindow &operator=(XWindow &&) = delete;
 
 	/** Make an image in this window */
 	void mkimage(ImageFile const &, QString);

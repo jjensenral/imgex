@@ -24,31 +24,35 @@ main([[maybe_unused]] int argc, [[maybe_unused]] char *argv[])
                               "testimg3.jpg"};
 	QGuiApplication app(argc, argv);
 
-    std::vector<XWindow> windows;
-    windows.reserve(3); // try to prevent moving elements
+    std::vector<std::unique_ptr<XWindow>> windows;
     // create a window but don't show it yet
-    windows.emplace_back(nullptr);
+    windows.emplace_back(std::make_unique<XWindow>());
     // Compatibility
-    XWindow &w = windows[0];
+    XWindow &w = *(windows[0].get());
 
     QScreen *s = w.screen();
-    QRect geom{s->virtualGeometry()};
+
     auto y = s->virtualSiblings();
     // create windows for the other screens
     auto c{0};
     for( auto z : y ) {
+        auto geom = z->geometry();
         if( z != s ) {
             fmt::print(stderr, "Creating window on screen {}\n", c);
-            windows.emplace_back(z);
+            windows.emplace_back(std::make_unique<XWindow>(z));
         } else {
             fmt::print(stderr, "No window needed for screen {}\n", c);
         }
+        auto &win = windows.back();
+        geom.adjust(20, 20, -20, -20);
+        fmt::print(stderr, "Placing window {} at {}x{}+{}+{}\n", c, geom.width(), geom.height(),
+                   geom.x(), geom.y());
+        win->setGeometry(geom);
         ++c;
     }
 
-    fmt::print(stderr, "{}x{}+{}+{}\n", geom.width(), geom.height(), geom.x(), geom.y());
     // Now show them all
-    for( auto &m : windows ) m.show();
+    for( auto &m : windows ) m->showMaximized();
 
 	for( auto const &fn : files ) {
 		try {

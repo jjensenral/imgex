@@ -270,21 +270,6 @@ XWindow::XWindow(QScreen *scr) : QWindow(scr), qbs_(this)
 }
 
 
-XWindow::XWindow(XWindow &&other) : ximgs_(other.ximgs_), qbs_(QBackingStore(this))
-{
-    fmt::print(stderr, "XWindow move is buggy\n"); // debug
-    // TODO? generate an expose since we restart with a blank backing store
-}
-
-
-#if 0
-XWindow &XWindow::operator=(XWindow &&other) {
-    ximgs_ = std::move(other.ximgs_)
-    return <#initializer#>;
-}
-#endif
-
-
 XILImage *
 XWindow::img_at(auto args...) noexcept
 {

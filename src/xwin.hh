@@ -15,7 +15,6 @@
 
 
 #include "transform.hh"
-#include "session.hh"
 #include "image.hh"
 
 

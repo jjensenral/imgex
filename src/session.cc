@@ -10,7 +10,7 @@ Session::Session(int argc, char **argv) : app_(argc, argv),
                                           windows_()
 {
     // Create a window somewhere
-    windows_.emplace_back(std::make_unique<XWindow>(nullptr));
+    windows_.emplace_back(std::make_unique<XWindow>(*this, nullptr));
     XWindow *w = windows_[0].get();
     QScreen *s = w->screen();
 
@@ -21,7 +21,7 @@ Session::Session(int argc, char **argv) : app_(argc, argv),
         auto geom = z->geometry();
         if( z != s ) {
             fmt::print(stderr, "Creating window on screen {}\n", c);
-            windows_.emplace_back(std::make_unique<XWindow>(z));
+            windows_.emplace_back(std::make_unique<XWindow>(*this, z));
         } else {
             fmt::print(stderr, "No window needed for screen {}\n", c);
         }
@@ -54,4 +54,17 @@ Session::lock()
 void
 Session::unlock()
 {
+}
+
+
+XWindow *
+Session::xwindow_at(QPoint p) const noexcept
+{
+    // XXX for now we just return the first window we find rather than the topmost
+    for( auto const &w : windows_ ) {
+        if(w->contains(p)) {
+            return w.get();
+        }
+    }
+    return nullptr;
 }

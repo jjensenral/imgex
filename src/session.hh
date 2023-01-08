@@ -38,6 +38,11 @@ class Session final {
         windows_[0]->mkimage(img, fn);
     }
 
+    /** XWindow at a given screen location
+     * @return Pointer to topmost XWindow at location or nullptr if there is no XWindow
+     */
+    [[nodiscard]] XWindow *xwindow_at(QPoint) const noexcept;
+
     /** Persist all session data */
     void persist(class Persist &);
 

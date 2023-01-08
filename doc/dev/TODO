@@ -2,14 +2,15 @@ TODO
 - Lots of functionality is missing
   - Persistence and sessions
   - File selection
-  - Switch image within a XILWindow
-  - Raise/lower image inside XILWindow
+  - Switch image within a XILWindow (as alternative to file selector)?
+  - Raise/lower image inside XWindow
   - Choosing when to persist image manipulations
 - Maybe switch to float coordinates (QRectF) instead of integer (QRect)
 - Move XILWindows from one XWindow to another (it can't just be moved with the mouse)
 - ImageFile should check whether the file exists when it's created
 - Some of the event handled logic needs tidying up?
 - Compile and test with Qt6
+- Support for opening/closing an individual XWindow
 
 BUGS
 - If zooming a window with an active crop, the crop does not change its size

@@ -1,6 +1,7 @@
 #include "xwin.hh"
 #include "image.hh"
 #include "decor.hh"
+#include "session.hh"
 #include <iterator>
 #include <exception>
 #include <algorithm>
@@ -194,11 +195,7 @@ XILImage::exposeEvent(QExposeEvent *ev)
 void
 XILImage::mkexpose(xwParentBox const &area) const
 {
-	QWindow *parent = this->parent();
-	if(parent != nullptr) {
-		// XXX can't fail
-		dynamic_cast<XWindow *>(parent)->redraw(area);
-	}
+	parent_->redraw(area);
 }
 
 
@@ -260,12 +257,36 @@ XILImage::crop(QRect rect) {
 
 QRect
 XILImage::move_to(QPoint point) {
+    (void)rehome_at(point);
     QWindow::setPosition(point);
     return Transformable::move_to(point);
 }
 
 
-XWindow::XWindow(QScreen *scr) : QWindow(scr), qbs_(this)
+bool
+XILImage::rehome_at(QPoint q)
+{
+    XWindow *home = parent_->xwindow_at(q);
+    if(!home) {
+        // optionally detach window
+        return false;
+    }
+    if(home != parent_) {
+        mkexpose(wbox_);
+        // ask our parent to give us a new home
+        if(!parent_->handover(*home, this)) {
+            fmt::print(stderr, "Failed to rehome {} at ({},{})", orig_->getFilename().toStdString(),
+                       q.x(), q.y());
+        }
+        QWindow::setParent(home);
+        // Redrawing at the new location is done higher up the stack
+        return true;
+    }
+    return false;
+}
+
+
+XWindow::XWindow(Session &ses, QScreen *scr) : QWindow(scr), qbs_(this), ses_(ses)
 {
 }
 
@@ -394,4 +415,47 @@ XWindow::mkimage(ImageFile const &fn, QString name)
 {
     auto img = std::make_unique<Image>(fn);
 	ximgs_.push_back(std::make_shared<XILImage>(*this, std::move(img), name));
+}
+
+
+XWindow *
+XWindow::xwindow_at(QPoint q)
+{
+    return ses_.xwindow_at(q);
+}
+
+
+bool
+XWindow::handover(XWindow &recip, XILImage *img) noexcept
+{
+    fmt::print(stderr, "handover before - source\n");
+    dumpimgs();
+    fmt::print(stderr, "handover before - recip\n");
+    recip.dumpimgs();
+    using iter = std::list<std::shared_ptr<XILImage>>::iterator;
+    auto pred = [img](std::shared_ptr<XILImage> &j) -> bool { return j.get() == img; };
+    iter f = std::find_if(ximgs_.begin(), ximgs_.end(), pred);
+    if(f == ximgs_.end())
+        return false;
+    try {
+        recip.ximgs_.push_back(*f);
+    }
+    catch(...) {
+        return false;
+    }
+    ximgs_.erase(f);
+    fmt::print(stderr, "handover after - source\n");
+    dumpimgs();
+    fmt::print(stderr, "handover after - recip\n");
+    recip.dumpimgs();
+    return true;
+}
+
+void XWindow::dumpimgs() const {
+    if(ximgs_.empty()) {
+        fmt::print(stderr, "empty\n");
+        return;
+    }
+    for( auto const &img : ximgs_ )
+        fmt::print(stderr, "{}\n", img->name_.toStdString());
 }

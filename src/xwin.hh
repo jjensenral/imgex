@@ -20,8 +20,7 @@
 
 class XWindow;
 class QScreen;
-class XMain;
-
+class Session;
 
 
 #include <QGuiApplication>
@@ -76,7 +75,7 @@ class XILImage final : public QWindow, public Transformable {
 	QBackingStore canvas_;
 
 	/** Parent window */
-	QWindow *parent_;
+	XWindow *parent_;
 
 	/** Offset into the child window for dragging */
 	QPoint loc;
@@ -105,14 +104,25 @@ class XILImage final : public QWindow, public Transformable {
 	 * \return true if event handled */
 	bool decor_event(QEvent &);
 
-#if 0
-	/** Move window */
-	void moveto(int x, int y) noexcept
-	{
-		wbox_.setX(x); wbox_.setY(y);
-		setPosition(x, y);
-	}
-#endif
+    /* Rehome this XILImage
+     * A XILImage is always(?) owned by an XWindow.
+     * However, while moving with the mouse the user may move it over to another XWindow
+     * in which case we need to transfer ownership and redraw.
+     *
+     * Note that Qt keeps sending events to the window in which the mouse was pressed until the
+     * mouse button is released, even if the pointer leaves the window or moves into another.
+     *
+     * Moreover, a user might unmaximize XWindows and have them overlap each other or there may
+     * be parts of the screen uncovered by an XWindow.
+     * For the former we can choose to transfer ownership when the mouse moves into another covering
+     * XWindow even though the image could remain in the covered XWindow.
+     * For the latter, a XILImage should never be outside of an XWindow, inaccessible to the user,
+     * so we can either undock it completely - it becomes an independent window - or reset back to
+     * where the move started.
+     *
+     * The return value is boolean: true if we were rehomed (or attempted rehomed)
+     */
+    bool rehome_at(QPoint q);
 
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
@@ -186,8 +196,10 @@ class XWindow final : public QWindow {
 	XILImage *img_at(auto args...) noexcept;
 	/** Background */
 	QBackingStore qbs_;
+    /** Reference to the session that we're part of */
+    Session &ses_;
  public:
-	XWindow(QScreen *scr = nullptr);
+	XWindow(Session &ses, QScreen *scr = nullptr);
 	XWindow(XWindow const &) = delete;
     // The move ctor is unsafe (probably) because XWindow inherits from QWindow
 	XWindow(XWindow &&) = delete;
@@ -204,12 +216,22 @@ class XWindow final : public QWindow {
 	void wheelEvent(QWheelEvent *) override;
 	void exposeEvent(QExposeEvent *) override;
 
+    bool contains(QPoint p) const noexcept { return geometry().contains(p); }
+    /** Call session to find another owner */
+    XWindow *xwindow_at(QPoint);
+
+    /** Hand over ownership of an image to another XWindow
+     * Returns true if the handover was successful
+     */
+    bool handover(XWindow &, XILImage *) noexcept;
+
 	/** Redraw the whole window */
 	void redraw(QRect);
 
+    void dumpimgs() const;
+
 	/** handle expose */
 	void expose(QRect const &);
-	friend class XMain;
 };
 
 

@@ -6,6 +6,7 @@
 
 #include <list>
 #include <memory>
+//#include <concepts>
 
 #include <QPaintDeviceWindow>
 #include <QBackingStore>
@@ -16,6 +17,31 @@
 
 #include "transform.hh"
 #include "image.hh"
+
+
+/**
+ * There are four kinds of coordinates
+ * 1. local coordinates within a single XILImage
+ * 2. Coordinates within an XWindow that hosts the XILImage
+ * 3. Coordinates in the screen, noting the user may have unmaximised/unfullscreened the XWindow
+ * 4. Coordinates in what Qt calls virtual geometry, the full desktop which may be composed of multiple screens
+ */
+
+// The template is only used to disambiguate the type
+template<typename KIND>
+struct qpoint: public QPoint
+{
+    // Construct from QRect
+    explicit qpoint<KIND>(QPoint const &q): QPoint(q) {}
+    // Treating it as the common base type requires explicit call
+    QPoint asQPoint() const noexcept { return *this; }
+};
+
+// These are just dummy bookkeeping (typekeeping) types
+struct xilimage {};
+struct xwindow {};
+struct screen {};
+struct desktop {};
 
 
 class XWindow;
@@ -35,7 +61,7 @@ protected:
 	XILImage const *owner_;
 
 	/* owner is set by XILImage::add_decorator
-	* Constructor is protected to prevent people creating decorates outside
+	* Constructor is protected to prevent people creating decorators outside
 	* of XILImage::add_decorator */
 	XILDecorator() : owner_(nullptr) {}
 public:
@@ -126,7 +152,7 @@ class XILImage final : public QWindow, public Transformable {
 
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
-	~XILImage() = default;
+	~XILImage();
 	XILImage(XILImage const &) = delete;
     // base class QImage has deleted move constructor
 	XILImage(XILImage &&) = delete;
@@ -234,5 +260,11 @@ class XWindow final : public QWindow {
 	void expose(QRect const &);
 };
 
+
+// Specialised coordinate types
+// General definition
+template<typename FROM, typename TO, typename AUX>
+//requires std::same_as<AUX, XILImage> || std::same_as<AUX, XWindow>
+qpoint<TO> convert(qpoint<FROM> const &, AUX const &);
 
 #endif

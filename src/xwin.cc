@@ -18,6 +18,76 @@
 #include <fstream>
 #include <fmt/core.h>
 
+
+
+template<>
+qpoint<desktop> convert<xilimage,desktop>(qpoint<xilimage> const &q, XILImage const &img)
+{
+    qpoint<desktop> w(q);
+    w += img.geometry().topLeft();
+    return w;
+}
+
+
+template<>
+qpoint<xwindow> convert<xilimage,xwindow>(qpoint<xilimage> const &q, XILImage const &img)
+{
+    qpoint<xwindow> w(q);
+    w += img.geometry().topLeft();
+    return w;
+}
+
+
+template<>
+qpoint<screen> convert<xilimage,screen>(qpoint<xilimage> const &q, XILImage const &img)
+{
+    qpoint<screen> w(q);
+    w += img.parent()->geometry().topLeft();
+    return w;
+}
+
+
+template<>
+qpoint<screen> convert<xwindow,screen>(qpoint<xwindow> const &q, XWindow const &win)
+{
+    qpoint<screen> w(q);
+    QScreen *scr = win.screen();
+    return w;
+}
+
+
+template<>
+qpoint<desktop> convert<xwindow,desktop>(qpoint<xwindow> const &q, XWindow const &win)
+{
+    qpoint<desktop> w(q);
+    QScreen *scr = win.screen();
+    return w;
+}
+
+// TEST FUNCTION
+void
+saypoint(XILImage const &xim, qpoint<xilimage> p)
+{
+    fmt::print("XIL ({},{})\n",p.x(), p.y());
+    auto a{convert<xilimage,xwindow,XILImage>(p, xim)};
+    fmt::print("XWN ({},{})\n",a.x(), a.y());
+    auto b{convert<xilimage,desktop,XILImage>(p, xim)};
+    fmt::print("DSK ({},{})\n",b.x(), b.y());
+    auto c{convert<xilimage,screen,XILImage>(p, xim)};
+    fmt::print("SCR ({},{})\n",c.x(), c.y());
+}
+
+void
+saypoint(XWindow const &xw, qpoint<xwindow> p)
+{
+    fmt::print("XWN ({},{})\n",p.x(), p.y());
+    auto b{convert<xwindow,desktop,XWindow>(p, xw)};
+    fmt::print("DSK ({},{})\n",b.x(), b.y());
+    auto c{convert<xwindow,screen,XWindow>(p, xw)};
+    fmt::print("SCR ({},{})\n",c.x(), c.y());
+}
+
+
 XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name) : QWindow(&xw), Transformable(img->getImage()),
                                                                          // Note we take ownership of the Image and img is invalid from now on
                                                                                    canvas_(this),
@@ -41,6 +111,19 @@ XILImage::copy_from(Transformable const &orig)
     Transformable::copy_from(orig);
     zoom_ = 1.0;
     mkexpose(oldbox | wbox_);
+}
+
+
+XILImage::~XILImage()
+{
+    /* Though it is safe to not do this, it would make sense to disconnect the XILImage from its
+     * parent window to prevent the parent QWindow (the XWindow) from attempting to destroy it
+     * when the XWindow is destroyed.  The problem could have arisen by the XWindow pointing to
+     * the XILImage twice: once in its ximgs_ structure and once as a Qt window parent.
+     */
+    QWindow::hide();
+    QWindow::setParent(nullptr);
+    parent_ = nullptr;
 }
 
 
@@ -91,8 +174,16 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 		track_ = true;
 	    break;
 	case Qt::MiddleButton:
+        // test
+#if 1
+    {
+        qpoint<xilimage> p{ev->pos()};
+        saypoint(*this, p);
+    }
+#else
             zoom_to(1.0);
             cache_ = QPixmap(); // Resetting size invalidates cache
+#endif
 		break;
 	case Qt::RightButton:
         // XXX for now, just start or end the crop process
@@ -279,7 +370,8 @@ XILImage::rehome_at(QPoint q)
                        q.x(), q.y());
         }
         QWindow::setParent(home);
-        // Redrawing at the new location is done higher up the stack
+        // Redrawing is done through our new parent
+        mkexpose(wbox_);
         return true;
     }
     return false;
@@ -370,8 +462,14 @@ XWindow::mousePressEvent(QMouseEvent *ev)
         return;
     }
 #endif
-	w->mousePressEvent(ev);
-	QWindow::mousePressEvent(ev);
+	if(w)
+        w->mousePressEvent(ev);
+    else {
+        // testing
+        qpoint<xwindow> fred{ev->pos()};
+        saypoint(*this, fred);
+        QWindow::mousePressEvent(ev);
+    }
 }
 
 

@@ -8,6 +8,7 @@
 #include <memory>
 
 #include <QGuiApplication>
+#include <QScreen>
 #include <QImage>
 #include <QPainter>
 #include <QString>
@@ -21,16 +22,39 @@
 
 
 template<>
-qpoint<desktop> convert<xilimage,desktop>(qpoint<xilimage> const &q, XILImage const &img)
+qpoint<screen> convert<screen>(qpoint<desktop> const &q, QWindow const &win)
 {
-    qpoint<desktop> w(q);
-    w += img.geometry().topLeft();
+    qpoint<screen> w{q};
+    QScreen const *scr = win.screen();
+    w -= scr->geometry().topLeft();
     return w;
 }
 
 
 template<>
-qpoint<xwindow> convert<xilimage,xwindow>(qpoint<xilimage> const &q, XILImage const &img)
+qpoint<desktop> convert<desktop>(qpoint<screen> const &q, QWindow const &win)
+{
+    qpoint<desktop> w{q};
+    QScreen const *scr = win.screen();
+    w += scr->geometry().topLeft();
+    return w;
+}
+
+
+template<>
+qpoint<desktop> convert<desktop,xilimage>(qpoint<xilimage> const &q, XILImage const &img)
+{
+    qpoint<desktop> w(q);
+    QWindow const *parent = img.parent();
+    w += img.geometry().topLeft();
+    if(parent)
+        w += parent->geometry().topLeft();
+    return w;
+}
+
+
+template<>
+qpoint<xwindow> convert<xwindow,xilimage>(qpoint<xilimage> const &q, XILImage const &img)
 {
     qpoint<xwindow> w(q);
     w += img.geometry().topLeft();
@@ -39,52 +63,54 @@ qpoint<xwindow> convert<xilimage,xwindow>(qpoint<xilimage> const &q, XILImage co
 
 
 template<>
-qpoint<screen> convert<xilimage,screen>(qpoint<xilimage> const &q, XILImage const &img)
+qpoint<screen> convert<screen,xilimage>(qpoint<xilimage> const &q, XILImage const &img)
+{
+    qpoint<desktop> w(convert<desktop>(q, img));
+    QWindow const &qw{img};
+    return convert<screen>(w, qw);
+}
+
+
+template<>
+qpoint<screen> convert<screen,xwindow>(qpoint<xwindow> const &q, XWindow const &win)
 {
     qpoint<screen> w(q);
-    w += img.parent()->geometry().topLeft();
+    QScreen const *scr = win.screen();
+    w += win.geometry().topLeft() - scr->geometry().topLeft();
     return w;
 }
 
 
 template<>
-qpoint<screen> convert<xwindow,screen>(qpoint<xwindow> const &q, XWindow const &win)
-{
-    qpoint<screen> w(q);
-    QScreen *scr = win.screen();
-    return w;
-}
-
-
-template<>
-qpoint<desktop> convert<xwindow,desktop>(qpoint<xwindow> const &q, XWindow const &win)
+qpoint<desktop> convert<desktop,xwindow>(qpoint<xwindow> const &q, XWindow const &win)
 {
     qpoint<desktop> w(q);
-    QScreen *scr = win.screen();
+    w += win.geometry().topLeft();
     return w;
 }
 
-// TEST FUNCTION
+
+// TEST FUNCTIONS
 void
 saypoint(XILImage const &xim, qpoint<xilimage> p)
 {
     fmt::print("XIL ({},{})\n",p.x(), p.y());
-    auto a{convert<xilimage,xwindow,XILImage>(p, xim)};
+    auto a{convert<xwindow>(p, xim)};
     fmt::print("XWN ({},{})\n",a.x(), a.y());
-    auto b{convert<xilimage,desktop,XILImage>(p, xim)};
-    fmt::print("DSK ({},{})\n",b.x(), b.y());
-    auto c{convert<xilimage,screen,XILImage>(p, xim)};
+    auto c{convert<screen>(p, xim)};
     fmt::print("SCR ({},{})\n",c.x(), c.y());
+    auto b{convert<desktop>(p, xim)};
+    fmt::print("DSK ({},{})\n",b.x(), b.y());
 }
 
 void
 saypoint(XWindow const &xw, qpoint<xwindow> p)
 {
     fmt::print("XWN ({},{})\n",p.x(), p.y());
-    auto b{convert<xwindow,desktop,XWindow>(p, xw)};
-    fmt::print("DSK ({},{})\n",b.x(), b.y());
-    auto c{convert<xwindow,screen,XWindow>(p, xw)};
+    auto c{convert<screen>(p, xw)};
     fmt::print("SCR ({},{})\n",c.x(), c.y());
+    auto b{convert<desktop>(p, xw)};
+    fmt::print("DSK ({},{})\n",b.x(), b.y());
 }
 
 

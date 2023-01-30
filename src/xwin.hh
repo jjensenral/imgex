@@ -24,20 +24,20 @@
  * 1. local coordinates within a single XILImage
  * 2. Coordinates within an XWindow that hosts the XILImage
  * 3. Coordinates in the screen, noting the user may have unmaximised/unfullscreened the XWindow
- * 4. Coordinates in what Qt calls virtual geometry, the full desktop which may be composed of multiple screens
+ * 4. Coordinates in what Qt calls the "virtual geometry" of the desktop which may be composed of multiple screens
  */
 
-// The template is only used to disambiguate the type
+// The template is currently only used to disambiguate the type
 template<typename KIND>
 struct qpoint: public QPoint
 {
     // Construct from QRect
     explicit qpoint<KIND>(QPoint const &q): QPoint(q) {}
     // Treating it as the common base type requires explicit call
-    QPoint asQPoint() const noexcept { return *this; }
+    // QPoint asQPoint() const noexcept { return *this; }
 };
 
-// These are just dummy bookkeeping (typekeeping) types
+// These are currently just dummy bookkeeping (typekeeping) types
 struct xilimage {};
 struct xwindow {};
 struct screen {};
@@ -262,8 +262,8 @@ class XWindow final : public QWindow {
 
 
 // Specialised coordinate types
-// General definition
-template<typename FROM, typename TO, typename AUX>
+// General definition.  TO comes first because the rest can be deduced from the arguments
+template<typename TO, typename FROM, typename AUX>
 //requires std::same_as<AUX, XILImage> || std::same_as<AUX, XWindow>
 qpoint<TO> convert(qpoint<FROM> const &, AUX const &);
 

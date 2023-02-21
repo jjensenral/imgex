@@ -6,7 +6,9 @@
 
 #include <list>
 #include <memory>
-//#include <concepts>
+#ifdef __cpp_concepts
+#include <concepts>
+#endif
 
 #include <QPaintDeviceWindow>
 #include <QBackingStore>
@@ -148,7 +150,7 @@ class XILImage final : public QWindow, public Transformable {
      *
      * The return value is boolean: true if we were rehomed (or attempted rehomed)
      */
-    bool rehome_at(QPoint q);
+    bool rehome_at(qpoint<desktop> q);
 
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
@@ -213,8 +215,8 @@ public:
  * Images are moved around inside windows, or between windows.
  */
 class XWindow final : public QWindow {
-	/** List of images, lowest first */
-	std::list<std::shared_ptr<XILImage>> ximgs_;
+	/** List of all images, whether owned by this XWindow or not, lowest first */
+	static std::list<std::shared_ptr<XILImage>> ximgs_;
 	/** Return a ptr to image at x,y or nullptr if there isn't one
 	 * Note this can't be const because it returns a pointer to a
 	 * non-const XILImage
@@ -231,8 +233,9 @@ class XWindow final : public QWindow {
 	XWindow(XWindow &&) = delete;
 	XWindow &operator=(XWindow const &) = delete;
 	XWindow &operator=(XWindow &&) = delete;
+    ~XWindow() override;
 
-	/** Make an image in this window */
+    /** Make an image in this window */
 	void mkimage(ImageFile const &, QString);
 	/** Events may be received by the main window, in which case the event needs dispatching to the child window */
 	void resizeEvent(QResizeEvent *) override;
@@ -244,19 +247,12 @@ class XWindow final : public QWindow {
 
     bool contains(QPoint p) const noexcept { return geometry().contains(p); }
     /** Call session to find another owner */
-    XWindow *xwindow_at(QPoint);
+    XWindow *xwindow_at(qpoint<desktop> q);
 
-    /** Hand over ownership of an image to another XWindow
-     * Returns true if the handover was successful
-     */
-    bool handover(XWindow &, XILImage *) noexcept;
-
-	/** Redraw the whole window */
+    /** Redraw the whole window */
 	void redraw(QRect);
 
-    void dumpimgs() const;
-
-	/** handle expose */
+    /** handle expose */
 	void expose(QRect const &);
 };
 
@@ -264,7 +260,9 @@ class XWindow final : public QWindow {
 // Specialised coordinate types
 // General definition.  TO comes first because the rest can be deduced from the arguments
 template<typename TO, typename FROM, typename AUX>
-//requires std::same_as<AUX, XILImage> || std::same_as<AUX, XWindow>
+#ifdef __cpp_concepts
+requires std::same_as<AUX, XILImage> || std::same_as<AUX, XWindow>
+#endif
 qpoint<TO> convert(qpoint<FROM> const &, AUX const &);
 
 #endif

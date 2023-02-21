@@ -42,7 +42,7 @@ qpoint<desktop> convert<desktop>(qpoint<screen> const &q, QWindow const &win)
 
 
 template<>
-qpoint<desktop> convert<desktop,xilimage>(qpoint<xilimage> const &q, XILImage const &img)
+qpoint<desktop> convert<desktop>(qpoint<xilimage> const &q, XILImage const &img)
 {
     qpoint<desktop> w(q);
     QWindow const *parent = img.parent();
@@ -54,7 +54,7 @@ qpoint<desktop> convert<desktop,xilimage>(qpoint<xilimage> const &q, XILImage co
 
 
 template<>
-qpoint<xwindow> convert<xwindow,xilimage>(qpoint<xilimage> const &q, XILImage const &img)
+qpoint<xwindow> convert<xwindow>(qpoint<xilimage> const &q, XILImage const &img)
 {
     qpoint<xwindow> w(q);
     w += img.geometry().topLeft();
@@ -63,7 +63,7 @@ qpoint<xwindow> convert<xwindow,xilimage>(qpoint<xilimage> const &q, XILImage co
 
 
 template<>
-qpoint<screen> convert<screen,xilimage>(qpoint<xilimage> const &q, XILImage const &img)
+qpoint<screen> convert<screen>(qpoint<xilimage> const &q, XILImage const &img)
 {
     qpoint<desktop> w(convert<desktop>(q, img));
     QWindow const &qw{img};
@@ -72,7 +72,7 @@ qpoint<screen> convert<screen,xilimage>(qpoint<xilimage> const &q, XILImage cons
 
 
 template<>
-qpoint<screen> convert<screen,xwindow>(qpoint<xwindow> const &q, XWindow const &win)
+qpoint<screen> convert<screen>(qpoint<xwindow> const &q, XWindow const &win)
 {
     qpoint<screen> w(q);
     QScreen const *scr = win.screen();
@@ -82,10 +82,19 @@ qpoint<screen> convert<screen,xwindow>(qpoint<xwindow> const &q, XWindow const &
 
 
 template<>
-qpoint<desktop> convert<desktop,xwindow>(qpoint<xwindow> const &q, XWindow const &win)
+qpoint<desktop> convert<desktop>(qpoint<xwindow> const &q, XWindow const &win)
 {
     qpoint<desktop> w(q);
     w += win.geometry().topLeft();
+    return w;
+}
+
+
+template<>
+qpoint<xwindow> convert<xwindow>(qpoint<desktop> const &q, XWindow const &win)
+{
+    qpoint<xwindow> w(q);
+    w -= win.geometry().topLeft();
     return w;
 }
 
@@ -201,7 +210,7 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 	    break;
 	case Qt::MiddleButton:
         // test
-#if 1
+#if 0
     {
         qpoint<xilimage> p{ev->pos()};
         saypoint(*this, p);
@@ -374,14 +383,16 @@ XILImage::crop(QRect rect) {
 
 QRect
 XILImage::move_to(QPoint point) {
-    (void)rehome_at(point);
+    qpoint<desktop> dest{point};
+    if(rehome_at(dest))
+        mkexpose();
     QWindow::setPosition(point);
     return Transformable::move_to(point);
 }
 
 
 bool
-XILImage::rehome_at(QPoint q)
+XILImage::rehome_at(qpoint<desktop> q)
 {
     XWindow *home = parent_->xwindow_at(q);
     if(!home) {
@@ -389,13 +400,29 @@ XILImage::rehome_at(QPoint q)
         return false;
     }
     if(home != parent_) {
+        // redraw at source location
         mkexpose(wbox_);
+        // Need to adjust the wbox which is about to leave the XWindow (wbox is in xwindow coordinates)
+        qpoint<xwindow> src{wbox_.topLeft()};
+#if 0
+        qpoint<desktop> dsk = convert<desktop>(src, parent_);
+        QRect newbox;
+        newbox.setTopLeft(convert<xwindow>(dsk, home));
+        newbox.setSize(wbox_.size());
+#endif
         // ask our parent to give us a new home
+#if 0
         if(!parent_->handover(*home, this)) {
-            fmt::print(stderr, "Failed to rehome {} at ({},{})", orig_->getFilename().toStdString(),
+            fmt::print(stderr, "Failed to rehome {} at ({},{})\n", orig_->getFilename().toStdString(),
                        q.x(), q.y());
         }
+#endif
+        fmt::print(stderr, "OLDBOX {} {}\n", src.x(), src.y());
+        wbox_.translate(home->geometry().topLeft() - parent_->geometry().topLeft());
+        fmt::print(stderr, "NEWBOX {} {}\n", wbox_.topLeft().x(), wbox_.topLeft().y());
         QWindow::setParent(home);
+        parent_ = home;
+//        wbox_ = newbox;
         // Redrawing is done through our new parent
         mkexpose(wbox_);
         return true;
@@ -406,6 +433,22 @@ XILImage::rehome_at(QPoint q)
 
 XWindow::XWindow(Session &ses, QScreen *scr) : QWindow(scr), qbs_(this), ses_(ses)
 {
+}
+
+
+std::list<std::shared_ptr<XILImage>> XWindow::ximgs_ = {};
+
+
+XWindow::~XWindow()
+{
+    /* Need to detach all child windows or Qt will destroy them */
+    for( auto &y : ximgs_ ) {
+        if(y->parent_ == this) {
+            y->hide();
+            y->setParent(nullptr);
+            y->parent_ = nullptr;
+        }
+    }
 }
 
 
@@ -494,6 +537,14 @@ XWindow::mousePressEvent(QMouseEvent *ev)
         // testing
         qpoint<xwindow> fred{ev->pos()};
         saypoint(*this, fred);
+        // Experiment: move one of the windows to here
+        if( !ximgs_.empty()  && ev->button() == Qt::MiddleButton ) {
+            auto img = ximgs_.front();
+            auto const pos{ev->globalPos()};
+            fmt::print(stderr, "Move to ({},{})\n", pos.x(), pos.y());
+            auto rect = img->move_to(pos);
+            redraw(rect);
+        }
         QWindow::mousePressEvent(ev);
     }
 }
@@ -543,43 +594,7 @@ XWindow::mkimage(ImageFile const &fn, QString name)
 
 
 XWindow *
-XWindow::xwindow_at(QPoint q)
+XWindow::xwindow_at(qpoint<desktop> q)
 {
     return ses_.xwindow_at(q);
-}
-
-
-bool
-XWindow::handover(XWindow &recip, XILImage *img) noexcept
-{
-    fmt::print(stderr, "handover before - source\n");
-    dumpimgs();
-    fmt::print(stderr, "handover before - recip\n");
-    recip.dumpimgs();
-    using iter = std::list<std::shared_ptr<XILImage>>::iterator;
-    auto pred = [img](std::shared_ptr<XILImage> &j) -> bool { return j.get() == img; };
-    iter f = std::find_if(ximgs_.begin(), ximgs_.end(), pred);
-    if(f == ximgs_.end())
-        return false;
-    try {
-        recip.ximgs_.push_back(*f);
-    }
-    catch(...) {
-        return false;
-    }
-    ximgs_.erase(f);
-    fmt::print(stderr, "handover after - source\n");
-    dumpimgs();
-    fmt::print(stderr, "handover after - recip\n");
-    recip.dumpimgs();
-    return true;
-}
-
-void XWindow::dumpimgs() const {
-    if(ximgs_.empty()) {
-        fmt::print(stderr, "empty\n");
-        return;
-    }
-    for( auto const &img : ximgs_ )
-        fmt::print(stderr, "{}\n", img->name_.toStdString());
 }

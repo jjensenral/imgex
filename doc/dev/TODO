@@ -7,6 +7,7 @@ TODO
   - Choosing when to persist image manipulations
 - Maybe switch to float coordinates (QRectF) instead of integer (QRect)
 - Move XILWindows from one XWindow to another (it can't just be moved with the mouse)
+  - Can we do it seamlessly so the image overlaps both XWindows during the transition?
 - ImageFile should check whether the file exists when it's created
 - Some of the event handled logic needs tidying up?
 - Compile and test with Qt6

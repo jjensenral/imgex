@@ -20,6 +20,7 @@ This may look slightly complicated partly due to the way Mermaid lays it out but
 
 - XMain is the main application
 - XWindow corresponds to a screen (a monitor)
+  - It must be a QWindow so it can receive X events from Qt 
 - XILImage is the main window file; it's so named because the code initially used the IL image library
   - XILImage represents an image as it appears on its XWindow (usually /in/ the window)
     - Image represents an image as loaded from storage; it can have image-specific transformations applied to it.

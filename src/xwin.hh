@@ -219,7 +219,7 @@ public:
  */
 class XWindow final : public QWindow {
 	/** List of all images, whether owned by this XWindow or not, lowest first */
-	static std::list<std::shared_ptr<XILImage>> ximgs_;
+	static std::list<XILImage> ximgs_;
 	/** Return a ptr to image at x,y or nullptr if there isn't one
 	 * Note this can't be const because it returns a pointer to a
 	 * non-const XILImage

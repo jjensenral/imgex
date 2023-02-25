@@ -158,9 +158,9 @@ XILImage::~XILImage()
      * the XILImage twice: once in its ximgs_ structure and once as a Qt window parent.
      */
     fmt::print(stderr, "Destroying image {}\n", xil_id_);
-    QWindow::hide();
-    QWindow::setParent(nullptr);
-    parent_ = nullptr;
+    //QWindow::hide();
+    // QWindow::setParent(nullptr);
+    //parent_ = nullptr;
 }
 
 
@@ -241,7 +241,6 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 	default:
 		break;
 	}
-	QWindow::mousePressEvent(ev);
 }
 
 
@@ -257,7 +256,6 @@ XILImage::mouseReleaseEvent(QMouseEvent *ev)
 	default:
 		break;
 	}
-	QWindow::mouseReleaseEvent(ev);
 }
 
 
@@ -286,7 +284,6 @@ XILImage::mouseMoveEvent(QMouseEvent *ev)
 		setPosition(newpos);
 		mkexpose( from | to );
 	}
-	QWindow::mouseMoveEvent(ev);
 }
 
 
@@ -308,7 +305,6 @@ XILImage::wheelEvent(QWheelEvent *ev)
 
 	mkexpose(zoom_to(zoom_));
     std::cerr << txfs_;
-	QWindow::wheelEvent(ev);
 }
 
 
@@ -319,7 +315,6 @@ XILImage::exposeEvent(QExposeEvent *ev)
 	//render();
 	xwParentBox bbox = ev->region().boundingRect();
 	mkexpose(bbox);
-	QWindow::exposeEvent(ev);
 }
 
 
@@ -441,7 +436,7 @@ XWindow::XWindow(Session &ses, QScreen *scr) : QWindow(scr), qbs_(this), ses_(se
 }
 
 
-std::list<std::shared_ptr<XILImage>> XWindow::ximgs_ = {};
+std::list<XILImage> XWindow::ximgs_ = {};
 
 unsigned int XWindow::win_ctr_ = 0;
 
@@ -449,10 +444,10 @@ XWindow::~XWindow()
 {
     /* Need to detach all child windows or Qt will destroy them */
     for( auto &y : ximgs_ ) {
-        if(y->parent_ == this) {
-            y->hide();
-            y->setParent(nullptr);
-            y->parent_ = nullptr;
+        if(y.parent_ == this) {
+            y.hide();
+            y.setParent(nullptr);
+            y.parent_ = nullptr;
         }
     }
 }
@@ -462,10 +457,10 @@ XILImage *
 XWindow::img_at(auto args...) noexcept
 {
 	// We must find the last (highest in stack) image that contains the point
-	std::reverse_iterator<std::list<std::shared_ptr<XILImage>>::iterator> p = ximgs_.rbegin(), q = ximgs_.rend();
+	std::reverse_iterator<std::list<XILImage>::iterator> p = ximgs_.rbegin(), q = ximgs_.rend();
 	// Annoyingly, std::find_if refuses to work with reverse iterator adaptors?
 	while( p != q ) {
-		if( (*p)->contains(args) ) return p->get();
+		if( p->contains(args) ) return &(*p);
 		++p;
 	}
 	return nullptr;
@@ -488,8 +483,8 @@ XWindow::redraw(QRect area)
 		qp.fillRect(area, QColor(0,0,0));
 		qp.end();
 		for( auto &x : ximgs_ )
-			if(x->intersects(area))
-				x->render();
+			if(x.intersects(area))
+				x.render();
         qbs_.endPaint();
         qbs_.flush(area, this);
 	} else std::cerr << "No paint" << std::endl;
@@ -545,10 +540,10 @@ XWindow::mousePressEvent(QMouseEvent *ev)
         saypoint(*this, fred);
         // Experiment: move one of the windows to here
         if( !ximgs_.empty()  && ev->button() == Qt::MiddleButton ) {
-            auto img = ximgs_.front();
+            auto &img = ximgs_.front();
             auto const pos{ev->globalPos()};
             fmt::print(stderr, "Move to ({},{})\n", pos.x(), pos.y());
-            auto rect = img->move_to(pos);
+            auto rect = img.move_to(pos);
             redraw(rect);
         }
         QWindow::mousePressEvent(ev);
@@ -595,7 +590,7 @@ void
 XWindow::mkimage(ImageFile const &fn, QString name)
 {
     auto img = std::make_unique<Image>(fn);
-	ximgs_.push_back(std::make_shared<XILImage>(*this, std::move(img), name));
+	ximgs_.emplace_back(*this, std::move(img), name);
 }
 
 

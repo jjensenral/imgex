@@ -128,7 +128,8 @@ XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name)
                                                                                    canvas_(this),
                                                                                    parent_(&xw), loc(0,0), track_(false), focused_(false),
                                                                                    resize_on_zoom_(true),
-                                                                                   zoom_(1.0f), name_(name)
+                                                                                   zoom_(1.0f), name_(name),
+                                                                                   xil_id_(++xil_ctr_)
 {
     orig_.swap(img);
 	// copy_from (re)sets wbox - we use the parent method since we're not ready to draw yet
@@ -156,10 +157,14 @@ XILImage::~XILImage()
      * when the XWindow is destroyed.  The problem could have arisen by the XWindow pointing to
      * the XILImage twice: once in its ximgs_ structure and once as a Qt window parent.
      */
+    fmt::print(stderr, "Destroying image {}\n", xil_id_);
     QWindow::hide();
     QWindow::setParent(nullptr);
     parent_ = nullptr;
 }
+
+
+unsigned int XILImage::xil_ctr_ = 0;
 
 
 void
@@ -418,11 +423,11 @@ XILImage::rehome_at(qpoint<desktop> q)
         }
 #endif
         fmt::print(stderr, "OLDBOX {} {}\n", src.x(), src.y());
-        wbox_.translate(home->geometry().topLeft() - parent_->geometry().topLeft());
+        auto newpos{convert<xwindow>(q, *home)};
+        wbox_.moveTo(newpos);
         fmt::print(stderr, "NEWBOX {} {}\n", wbox_.topLeft().x(), wbox_.topLeft().y());
         QWindow::setParent(home);
         parent_ = home;
-//        wbox_ = newbox;
         // Redrawing is done through our new parent
         mkexpose(wbox_);
         return true;
@@ -431,13 +436,14 @@ XILImage::rehome_at(qpoint<desktop> q)
 }
 
 
-XWindow::XWindow(Session &ses, QScreen *scr) : QWindow(scr), qbs_(this), ses_(ses)
+XWindow::XWindow(Session &ses, QScreen *scr) : QWindow(scr), qbs_(this), ses_(ses), win_id_(++win_ctr_)
 {
 }
 
 
 std::list<std::shared_ptr<XILImage>> XWindow::ximgs_ = {};
 
+unsigned int XWindow::win_ctr_ = 0;
 
 XWindow::~XWindow()
 {

@@ -20,8 +20,8 @@ Session::Session(int argc, char **argv) : app_(argc, argv),
     for( auto z : y ) {
         auto geom = z->geometry();
         if( z != s ) {
-            fmt::print(stderr, "Creating window on screen {}\n", c);
             windows_.emplace_back(std::make_unique<XWindow>(*this, z));
+            fmt::print(stderr, "Created window {} on screen {}\n", windows_.back()->win_id(), c);
         } else {
             fmt::print(stderr, "No window needed for screen {}\n", c);
         }

@@ -125,6 +125,9 @@ class XILImage final : public QWindow, public Transformable {
     /** Storage for decorators (overlays) */
 	std::list<XILDecorator *> decors_;
 
+    static unsigned int xil_ctr_;
+    unsigned int xil_id_;
+
 	/** Render the image in the window */
 	void render();
 
@@ -226,6 +229,9 @@ class XWindow final : public QWindow {
 	QBackingStore qbs_;
     /** Reference to the session that we're part of */
     Session &ses_;
+    /** Internal counter for window id */
+    static unsigned int win_ctr_;
+    unsigned int win_id_;
  public:
 	XWindow(Session &ses, QScreen *scr = nullptr);
 	XWindow(XWindow const &) = delete;
@@ -235,6 +241,7 @@ class XWindow final : public QWindow {
 	XWindow &operator=(XWindow &&) = delete;
     ~XWindow() override;
 
+    [[nodiscard]] unsigned int win_id() const noexcept { return win_id_; }
     /** Make an image in this window */
 	void mkimage(ImageFile const &, QString);
 	/** Events may be received by the main window, in which case the event needs dispatching to the child window */
@@ -249,7 +256,9 @@ class XWindow final : public QWindow {
     /** Call session to find another owner */
     XWindow *xwindow_at(qpoint<desktop> q);
 
-    /** Redraw the whole window */
+    /** Redraw the whole window
+     * \param qrect window coordinates, or null rect means everything
+     * */
 	void redraw(QRect);
 
     /** handle expose */

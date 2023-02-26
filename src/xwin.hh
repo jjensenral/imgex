@@ -94,11 +94,13 @@ public:
 };
 
 
-class XILImage final : public QWindow, public Transformable {
+class XILImage final : public Transformable {
 
  private:
     /** Reference to the image which we need to update with transformations etc */
     std::unique_ptr<Image> orig_;
+
+    QWindow *win_;
 
 	QBackingStore canvas_;
 
@@ -164,6 +166,9 @@ public:
 	XILImage &operator=(XILImage const &) = delete;
     XILImage &operator=(XILImage &&) = delete;
 
+    QRect geometry() const noexcept { return win_->geometry(); }
+    XWindow *parent() const noexcept { return parent_; }
+
     /** (Re)copy orig to working copy */
     void copy_from(Transformable const &orig) override;
 
@@ -191,16 +196,16 @@ public:
     void mkexpose(xwParentBox const &) const;
     void mkexpose() const { mkexpose(wbox_); }
 
-    /** Events, as defined by QWindow */
+    /** Events, as defined by QWindow.  We are not a QWindow but receive the events from the parent */
 	/*
 	void focusInEvent(QFocusEvent *) override { qWarning("  Focus %s", qPrintable(name_)); focused_ = true; };
 	void focusOutEvent(QFocusEvent *) override { qWarning("Unfocus %s", qPrintable(name_)); focused_ = false; };
 	*/
-	void mousePressEvent(QMouseEvent *) override;
-	void mouseReleaseEvent(QMouseEvent *) override;
-	void mouseMoveEvent(QMouseEvent *) override;
-	void wheelEvent(QWheelEvent *) override;
-	void exposeEvent(QExposeEvent *) override;
+	void mousePressEvent(QMouseEvent *);
+	void mouseReleaseEvent(QMouseEvent *);
+	void mouseMoveEvent(QMouseEvent *);
+	void wheelEvent(QWheelEvent *);
+	void exposeEvent(QExposeEvent *);
 
 	void add_decorator(XILDecorator *dec)
 	{

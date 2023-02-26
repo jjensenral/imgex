@@ -22,7 +22,7 @@
 
 
 template<>
-qpoint<screen> convert<screen>(qpoint<desktop> const &q, QWindow const &win)
+qpoint<screen> convert<screen>(qpoint<desktop> const &q, XWindow const &win)
 {
     qpoint<screen> w{q};
     QScreen const *scr = win.screen();
@@ -32,7 +32,7 @@ qpoint<screen> convert<screen>(qpoint<desktop> const &q, QWindow const &win)
 
 
 template<>
-qpoint<desktop> convert<desktop>(qpoint<screen> const &q, QWindow const &win)
+qpoint<desktop> convert<desktop>(qpoint<screen> const &q, XWindow const &win)
 {
     qpoint<desktop> w{q};
     QScreen const *scr = win.screen();
@@ -66,8 +66,8 @@ template<>
 qpoint<screen> convert<screen>(qpoint<xilimage> const &q, XILImage const &img)
 {
     qpoint<desktop> w(convert<desktop>(q, img));
-    QWindow const &qw{img};
-    return convert<screen>(w, qw);
+    XWindow const *p = img.parent();
+    return convert<screen>(w, *p);
 }
 
 
@@ -123,9 +123,10 @@ saypoint(XWindow const &xw, qpoint<xwindow> p)
 }
 
 
-XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name) : QWindow(&xw), Transformable(img->getImage()),
+XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name) : Transformable(img->getImage()),
+                                                                                   win_(new QWindow(&xw)),
                                                                          // Note we take ownership of the Image and img is invalid from now on
-                                                                                   canvas_(this),
+                                                                                   canvas_(win_),
                                                                                    parent_(&xw), loc(0,0), track_(false), focused_(false),
                                                                                    resize_on_zoom_(true),
                                                                                    zoom_(1.0f), name_(name),
@@ -134,9 +135,9 @@ XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name)
     orig_.swap(img);
 	// copy_from (re)sets wbox - we use the parent method since we're not ready to draw yet
     Transformable::copy_from(*orig_);
-    setGeometry(wbox_);
+    win_->setGeometry(wbox_);
     canvas_.resize(wbox_.size());
-	show();
+    win_->show();
 }
 
 
@@ -170,10 +171,10 @@ unsigned int XILImage::xil_ctr_ = 0;
 void
 XILImage::render()
 {
-	if(!isExposed())
+	if(!win_->isExposed())
 		return;
     // local coordinates
-	QRect reg{0, 0, width(), height()};
+	QRect reg{0, 0, win_->width(), win_->height()};
 	canvas_.beginPaint(reg);
 	QPaintDevice *pd = canvas_.paintDevice();
 	if(!pd) {
@@ -189,7 +190,7 @@ XILImage::render()
 	std::for_each(decors_.begin(), decors_.end(), [&p](XILDecorator *dr) { dr->render(p); });
 	p.end();
 	canvas_.endPaint();				// also frees pd
-	canvas_.flush(reg, this);
+	canvas_.flush(reg, win_);
 }
 
 
@@ -206,7 +207,7 @@ XILImage::mousePressEvent(QMouseEvent *ev)
 		loc = ev->globalPos();
 		oldq_ = loc;
 		loc -= wbox_.topLeft();
-		if(QWindow *p = this->parent()) {
+		if(QWindow *p = win_->parent()) {
 			loc -= p->position();
 		}
 		// Now find position relative to the top left corner
@@ -270,18 +271,18 @@ XILImage::mouseMoveEvent(QMouseEvent *ev)
 		QPoint q{ev->globalPos()};
 		QPoint delta{ q-oldq_ };
 		oldq_ = q;
-		QPoint newpos{position() + delta };
+		QPoint newpos{win_->position() + delta };
 		xwParentBox to{ newpos, from.size() };
 		wbox_ = to;
-		if(isTopLevel()) {
+		if(win_->isTopLevel()) {
 			// XXX untested
-			setPosition(newpos);
+            win_->setPosition(newpos);
 		} else {
 			// Current mouse position relative to parent window
-			q -= parent()->position();
+			q -= win_->parent()->position();
 		}
 		// Move the window to the new location
-		setPosition(newpos);
+        win_->setPosition(newpos);
 		mkexpose( from | to );
 	}
 }
@@ -363,7 +364,7 @@ XILImage::zoom_to(float g) {
     // Need to resize canvas before we call zoom
     QSize q = zoom_box(g);
     canvas_.resize(q);
-    QWindow::resize(q);
+    win_->resize(q);
     return Transformable::zoom_to(g);
 }
 
@@ -375,7 +376,7 @@ XILImage::crop(QRect rect) {
     fmt::print(stderr, "WBOX {}x{}+{}+{}\n", wbox_.width(), wbox_.height(), wbox_.x(), wbox_.y());
     fmt::print(stderr, "TXFS {}x{}+{}+{}\n", txfs_.crop_.width(), txfs_.crop_.height(), txfs_.crop_.x(), txfs_.crop_.y());
     canvas_.resize(wbox_.size());
-    QWindow::resize(wbox_.size());
+    win_->resize(wbox_.size());
     // It is safe to ignore the return value here since we move wholly inside the larger (original) box q
     move_to(wbox_.topLeft());
     return q;
@@ -386,7 +387,7 @@ XILImage::move_to(QPoint point) {
     qpoint<desktop> dest{point};
     if(rehome_at(dest))
         mkexpose();
-    QWindow::setPosition(point);
+    win_->setPosition(point);
     return Transformable::move_to(point);
 }
 
@@ -421,7 +422,7 @@ XILImage::rehome_at(qpoint<desktop> q)
         auto newpos{convert<xwindow>(q, *home)};
         wbox_.moveTo(newpos);
         fmt::print(stderr, "NEWBOX {} {}\n", wbox_.topLeft().x(), wbox_.topLeft().y());
-        QWindow::setParent(home);
+        win_->setParent(home);
         parent_ = home;
         // Redrawing is done through our new parent
         mkexpose(wbox_);
@@ -445,8 +446,9 @@ XWindow::~XWindow()
     /* Need to detach all child windows or Qt will destroy them */
     for( auto &y : ximgs_ ) {
         if(y.parent_ == this) {
-            y.hide();
-            y.setParent(nullptr);
+            // this could do with refactoring but currently XWindow is a friend of XILImage
+            y.win_->hide();
+            y.win_->setParent(nullptr);
             y.parent_ = nullptr;
         }
     }
@@ -475,7 +477,7 @@ XWindow::redraw(QRect area)
 		area = window;
 	else
 		area &= window;
-    //fmt::print(stderr, "REDRAW({: >3d} {: >3d} {: >3d} {: >3d})\n", area.x(), area.y(), area.width(), area.height());
+    fmt::print(stderr, "WIN {} REDRAW({: >3d} {: >3d} {: >3d} {: >3d})\n", win_id_, area.x(), area.y(), area.width(), area.height());
 	qbs_.beginPaint(area);
 	QPaintDevice *dev = qbs_.paintDevice();
 	if(dev) {
@@ -497,6 +499,9 @@ XWindow::exposeEvent(QExposeEvent *ev)
 	if(!isExposed())
 		return;
 	QRect bbox(ev->region().boundingRect());
+    qpoint<desktop> oldtopl{bbox.topLeft()};
+    qpoint<xwindow> newtopl = convert<xwindow>(oldtopl, *this);
+    bbox.moveTo(newtopl);
 	redraw(bbox);
 	QWindow::exposeEvent(ev);
 }

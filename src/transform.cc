@@ -48,7 +48,7 @@ Transformable::run()
 }
 
 
-QRect Transformable::move_to(QPoint point)
+QRect Transformable::move_to(qpoint<xwindow> point)
 {
     QRect oldbox{wbox_};
     QRect newbox{point, oldbox.size()};

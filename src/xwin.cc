@@ -124,7 +124,7 @@ XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name)
     orig_.swap(img);
 	// copy_from (re)sets wbox - we use the parent method since we're not ready to draw yet
     Transformable::copy_from(*orig_);
-    setGeometry(wbox_);
+    setGeometry(wbox_.asQRect());
     canvas_.resize(wbox_.size());
 	show();
 }
@@ -133,7 +133,7 @@ XILImage::XILImage(XWindow &xw, std::unique_ptr<Image> img, QString const &name)
 void
 XILImage::copy_from(Transformable const &orig)
 {
-    QRect oldbox{wbox_};
+    auto oldbox{wbox_};
     Transformable::copy_from(orig);
     zoom_ = 1.0;
     mkexpose(oldbox | wbox_);
@@ -312,7 +312,7 @@ XILImage::exposeEvent(QExposeEvent *ev)
 void
 XILImage::mkexpose(xwParentBox const &area) const
 {
-	parent_->redraw(area);
+	parent_->redraw(area.asQRect());
 }
 
 
@@ -344,7 +344,7 @@ void
 XILImage::run()
 {
     // This is like Transformable::run() except we need to track the bounding boxes
-    QRect box{wbox_};
+    auto box{wbox_};
     // TODO
     mkexpose(box);
 }
@@ -363,7 +363,7 @@ XILImage::crop(QRect rect) {
     fmt::print(stderr, "CROP {}x{}+{}+{}\n", rect.width(), rect.height(), rect.x(), rect.y());
     QRect q = Transformable::crop(rect);
     fmt::print(stderr, "RDRW {}x{}+{}+{}\n", q.width(), q.height(), q.x(), q.y());
-    fmt::print(stderr, "WBOX {}x{}+{}+{}\n", wbox_.width(), wbox_.height(), wbox_.x(), wbox_.y());
+    fmt::print(stderr, "WBOX {}x{}+{}+{}\n", wbox_.width(), wbox_.height(), wbox_.topLeft().x(), wbox_.topLeft().y());
     fmt::print(stderr, "TXFS {}x{}+{}+{}\n", txfs_.crop_.width(), txfs_.crop_.height(), txfs_.crop_.x(), txfs_.crop_.y());
     canvas_.resize(wbox_.size());
     QWindow::resize(wbox_.size());
@@ -373,15 +373,18 @@ XILImage::crop(QRect rect) {
 }
 
 QRect
-XILImage::move_to(QPoint point) {
-    (void)rehome_at(point);
+XILImage::move_to(qpoint<xwindow> point)
+{
+    qpoint<desktop> dp = convert<desktop>(point, *parent_);
+    (void)rehome_at(dp);
     QWindow::setPosition(point);
+    // TODO: check this
     return Transformable::move_to(point);
 }
 
 
 bool
-XILImage::rehome_at(QPoint q)
+XILImage::rehome_at(qpoint<desktop> q)
 {
     XWindow *home = parent_->xwindow_at(q);
     if(!home) {
@@ -406,6 +409,21 @@ XILImage::rehome_at(QPoint q)
 
 XWindow::XWindow(Session &ses, QScreen *scr) : QWindow(scr), qbs_(this), ses_(ses)
 {
+}
+
+
+qpoint<xwindow>
+XWindow::ev_pos(const QMouseEvent &mev) const noexcept
+{
+    qpoint<xwindow> p{ mev.globalPos() };
+    return p;
+}
+
+qpoint<xwindow>
+XWindow::ev_pos(const QWheelEvent &mev) const noexcept
+{
+    qpoint<xwindow> p{ mev.globalPos() };
+    return p;
 }
 
 
@@ -469,7 +487,7 @@ XWindow::resizeEvent(QResizeEvent *ev)
 void
 XWindow::mousePressEvent(QMouseEvent *ev)
 {
-	XILImage *w = img_at(ev->globalPos());
+	XILImage *w = img_at(ev_pos(*ev));
 #if 0
 	if(!w) {
         // XXX temporary hack
@@ -502,7 +520,7 @@ XWindow::mousePressEvent(QMouseEvent *ev)
 void
 XWindow::mouseReleaseEvent(QMouseEvent *ev)
 {
-	XILImage *w = img_at(ev->globalPos());
+	XILImage *w = img_at(ev_pos(*ev));
 	if(!w) return;
 	w->mouseReleaseEvent(ev);
 	QWindow::mouseReleaseEvent(ev);
@@ -512,7 +530,7 @@ XWindow::mouseReleaseEvent(QMouseEvent *ev)
 void
 XWindow::mouseMoveEvent(QMouseEvent *ev)
 {
-	XILImage *w = img_at(ev->globalPos());
+	XILImage *w = img_at(ev_pos(*ev));
 	if(!w) return;
 	w->mouseMoveEvent(ev);
 	QWindow::mouseMoveEvent(ev);
@@ -526,7 +544,7 @@ XWindow::wheelEvent(QWheelEvent *ev)
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
             img_at(ev->globalPosition().toPoint());
 #else
-            img_at(ev->globalPos());
+            img_at(ev_pos(*ev));
 #endif
 	if(!w) return;
 	w->wheelEvent(ev);
@@ -543,9 +561,9 @@ XWindow::mkimage(ImageFile const &fn, QString name)
 
 
 XWindow *
-XWindow::xwindow_at(QPoint q)
+XWindow::xwindow_at(qpoint<desktop> p)
 {
-    return ses_.xwindow_at(q);
+    return ses_.xwindow_at(p);
 }
 
 
@@ -557,7 +575,7 @@ XWindow::handover(XWindow &recip, XILImage *img) noexcept
     fmt::print(stderr, "handover before - recip\n");
     recip.dumpimgs();
     using iter = std::list<std::shared_ptr<XILImage>>::iterator;
-    auto pred = [img](std::shared_ptr<XILImage> &j) -> bool { return j.get() == img; };
+    auto pred = [img](std::shared_ptr<XILImage> const &j) -> bool { return j.get() == img; };
     iter f = std::find_if(ximgs_.begin(), ximgs_.end(), pred);
     if(f == ximgs_.end())
         return false;

@@ -58,7 +58,7 @@ Session::unlock()
 
 
 XWindow *
-Session::xwindow_at(QPoint p) const noexcept
+Session::xwindow_at(qpoint<desktop> p) const noexcept
 {
     // XXX for now we just return the first window we find rather than the topmost
     for( auto const &w : windows_ ) {

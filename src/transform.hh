@@ -10,6 +10,7 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/list.hpp>
 #include <cmath>
+#include "xwin.hh"
 
 class QString;
 
@@ -41,7 +42,7 @@ private:
     friend class XWindow;
 public:
     /** Alias for XILImage's box in parent's coordinates */
-    typedef QRect xwParentBox;
+    typedef qbox<xwindow> xwParentBox;
 
     Transformable(ImageFile const &fn);
 
@@ -62,7 +63,7 @@ public:
 
     /** Move to new topleft global position
      * Returns the global rectangle to redraw */
-    virtual QRect move_to(QPoint point);
+    virtual QRect move_to(qpoint<xwindow> point);
 
     /** Zoom to (absolute value)
      * Returns the global rectangle to redraw */
@@ -96,7 +97,7 @@ protected:
      */
      QPixmap cache_;
     /** placement on main window; width and height equivalent to the image size times scale */
-    xwParentBox wbox_;
+    qbox<xwindow> wbox_;
 
     QSize zoom_box(float g)
     {

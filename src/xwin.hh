@@ -15,10 +15,6 @@
 #include <QRect>
 
 
-#include "transform.hh"
-#include "image.hh"
-
-
 /**
  * There are four kinds of coordinates
  * 1. local coordinates within a single XILImage
@@ -43,13 +39,56 @@ struct xwindow {};
 struct screen {};
 struct desktop {};
 
+template<typename KIND>
+struct qbox
+{
+    qpoint<KIND> topl_;
+    QSize size_;
+public:
+    qbox() noexcept : topl_(), size_() {}
+    qbox(int x, int y, int w, int h) noexcept : topl_(x,y), size_(w,h) {}
+    qbox(QPoint topl, QSize size) : topl_(topl), size_(size) {}
+    qbox(qpoint<KIND> topl, QSize size) : topl_(topl), size_(size) {}
+    qbox(QRect const &other) noexcept : topl_(other.topLeft()), size_(other.size()) {}
+    qbox(qpoint<KIND> const &topl, QSize const &size) noexcept : topl_(topl), size_(size) {}
+
+    decltype(auto) width() const noexcept { return size_.width(); }
+    decltype(auto) height() const noexcept { return size_.height(); }
+
+    qpoint<KIND> topLeft() const noexcept { return topl_; }
+    QSize size() const noexcept { return size_; }
+
+    bool contains(qpoint<KIND> const &p) const noexcept
+    {
+        QRect qr(topl_, size_);
+        return qr.contains(p);
+    }
+    bool intersects(qbox<KIND> const &q) const noexcept
+    {
+        QRect qra(topl_, size_), qrb(q.topl_, q.size_);
+        return qra.intersects(qrb);
+    }
+    qbox<KIND> operator|(qbox<KIND> const &q)
+    {
+        QRect qra(topl_, size_), qrb(q.topl_, q.size_);
+        QRect qrc{ qra | qrb };
+        qbox<KIND> qb{qrc.topLeft(), qrc.size()};
+        return qrc;
+    }
+    QRect asQRect() const noexcept
+    {
+        QRect q(topl_, size_);
+        return q;
+    }
+};
 
 class XWindow;
 class QScreen;
 class Session;
 
 
-#include <QGuiApplication>
+#include "transform.hh"
+#include "image.hh"
 
 
 /** Decorator for XILImage class */
@@ -148,7 +187,7 @@ class XILImage final : public QWindow, public Transformable {
      *
      * The return value is boolean: true if we were rehomed (or attempted rehomed)
      */
-    bool rehome_at(QPoint q);
+    bool rehome_at(qpoint<desktop>);
 
 public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
@@ -166,7 +205,7 @@ public:
 
     QRect crop(QRect rect) override;
 
-    QRect move_to(QPoint point) override;
+    QRect move_to(qpoint<xwindow> point) override;
 
     /** (Re)run transform on current image */
     void run() override;
@@ -174,10 +213,10 @@ public:
     /** Call clear */
 	// void clear(Display *d, Window w) const { XClearArea(d, w, wbox_.x, wbox_.y, wbox_.h, wbox_.y, 0); }
 	/** Does this image contain point x,y (as mapped on window) */
-	bool contains(int x, int y) const noexcept { return wbox_.contains(x,y); }
-	bool contains(QPoint p) const noexcept { return wbox_.contains(p); }
+	// bool contains(int x, int y) const noexcept { return wbox_.contains(x,y); }
+	bool contains(qpoint<xwindow> p) const noexcept { return wbox_.contains(p); }
 	/** Does this image intersect a given box? */
-	bool intersects(xwParentBox const &b) const noexcept { return wbox_.intersects(b); }
+	bool intersects(qbox<xwindow> const &b) const noexcept { return wbox_.intersects(b); }
 	
 	/** Bounding box in own coordinates */
 	QRect box() const noexcept { return QRect(0, 0, wbox_.width(), wbox_.height()); }
@@ -220,6 +259,10 @@ class XWindow final : public QWindow {
 	 * non-const XILImage
 	 */
 	XILImage *img_at(auto args...) noexcept;
+    /** Utility to return the coordinate of a (mouse) event */
+    // todo: merge these two again
+    qpoint<xwindow> ev_pos(QMouseEvent const &) const noexcept;
+    qpoint<xwindow> ev_pos(QWheelEvent const &) const noexcept;
 	/** Background */
 	QBackingStore qbs_;
     /** Reference to the session that we're part of */
@@ -244,7 +287,7 @@ class XWindow final : public QWindow {
 
     bool contains(QPoint p) const noexcept { return geometry().contains(p); }
     /** Call session to find another owner */
-    XWindow *xwindow_at(QPoint);
+    XWindow *xwindow_at(qpoint<desktop>);
 
     /** Hand over ownership of an image to another XWindow
      * Returns true if the handover was successful
@@ -266,5 +309,12 @@ class XWindow final : public QWindow {
 template<typename TO, typename FROM, typename AUX>
 //requires std::same_as<AUX, XILImage> || std::same_as<AUX, XWindow>
 qpoint<TO> convert(qpoint<FROM> const &, AUX const &);
+
+template<typename TO, typename FROM, typename AUX>
+qbox<TO> convert(qbox<FROM> const &box, AUX const &helper)
+{
+    qbox<TO> q(convert<TO,FROM,AUX>(box.topLeft(), box.size()));
+    return q;
+}
 
 #endif

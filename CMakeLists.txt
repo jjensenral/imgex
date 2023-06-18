@@ -21,7 +21,7 @@ add_executable(imgex
   src/decor.cc
   src/session.cc
   src/transform.cc
-  src/xwin.cc)
+  src/xwin.cc src/qbox.hh)
 
 target_compile_features(imgex PUBLIC cxx_std_20)
 # Doesn't seem to be a compile feature in cmake yet?

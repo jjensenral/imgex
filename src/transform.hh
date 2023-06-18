@@ -10,7 +10,7 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/list.hpp>
 #include <cmath>
-#include "xwin.hh"
+#include "qbox.hh"
 
 class QString;
 

@@ -50,7 +50,7 @@ Transformable::run()
 
 QRect Transformable::move_to(qpoint<xwindow> point)
 {
-    QRect oldbox{wbox_};
+    QRect oldbox{wbox_.asQRect()};
     QRect newbox{point, oldbox.size()};
     txfs_.move_ = point;
     wbox_ = newbox;
@@ -65,14 +65,14 @@ QRect Transformable::zoom_to(float g)
     QSize target = zoom_box(g);
     img_ = cache_.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 
-    QRect oldbox{wbox_};
+    qbox<xwindow> oldbox{wbox_};
     // FIXME allow zooming around centre or mouse point
     QSize offset = (target - wbox_.size())/2;
     wbox_.setSize(target);
     // As the image grows/shrinks, shift top left accordingly
     //move_to(QPoint(wbox_.x()+offset.width(), wbox_.y()+offset.height()));
     // One box will be larger than the other depending on whether we zoom in or out
-    return oldbox | wbox_;
+    return (oldbox | wbox_).asQRect();
 }
 
 QRect Transformable::crop(QRect c)
@@ -80,9 +80,9 @@ QRect Transformable::crop(QRect c)
     // Note that c comes in local coordinates
     img_ = img_.copy(c);
 
-    QRect oldbox{wbox_}; // note global coordinates (top left rel to parent window)
+    QRect oldbox{wbox_.asQRect()}; // note global coordinates (top left rel to parent window)
     // Shift display box so the result image is in the box it was selected from
-    wbox_.adjust(c.x(), c.y(), 0, 0);
+    wbox_.move(c.x(), c.y());
     wbox_.setSize(c.size());
     // crop the current pre-zoom image as well
     if(txfs_.has_zoom()) {

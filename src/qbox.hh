@@ -17,8 +17,8 @@ template<typename KIND>
 struct qpoint: public QPoint
 {
     // Construct from QRect
-    qpoint<KIND>(): QPoint() {}
-    explicit qpoint<KIND>(QPoint const &q): QPoint(q) {}
+    qpoint(): QPoint() {}
+    explicit qpoint(QPoint const &q): QPoint(q) {}
     // Treating it as the common base type requires explicit call
     // QPoint asQPoint() const noexcept { return *this; }
     void move(int dx, int dy) noexcept

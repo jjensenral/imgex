@@ -542,7 +542,7 @@ XWindow::wheelEvent(QWheelEvent *ev)
 {
 	XILImage *w =
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
-            img_at(ev->globalPosition().toPoint());
+            img_at(ev_pos(*ev));
 #else
             img_at(ev_pos(*ev));
 #endif

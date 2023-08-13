@@ -82,6 +82,15 @@ qpoint<screen> convert<screen,xwindow>(qpoint<xwindow> const &q, XWindow const &
 
 
 template<>
+qpoint<xwindow> convert<xwindow,desktop>(qpoint<desktop> const &q, XWindow const &win)
+{
+    qpoint<xwindow> w(q);
+    w -= win.geometry().topLeft();
+    return w;
+}
+
+
+template<>
 qpoint<desktop> convert<desktop,xwindow>(qpoint<xwindow> const &q, XWindow const &win)
 {
     qpoint<desktop> w(q);
@@ -574,6 +583,11 @@ XWindow::handover(XWindow &recip, XILImage *img) noexcept
     dumpimgs();
     fmt::print(stderr, "handover before - recip\n");
     recip.dumpimgs();
+    // debug
+    auto pt = img->wbox_.topLeft();
+    auto pd = convert<desktop>(pt, *(img->parent_));
+    saypoint(*(img->parent_), pt);
+    pt = convert<xwindow>(pd, recip);
     using iter = std::list<std::shared_ptr<XILImage>>::iterator;
     auto pred = [img](std::shared_ptr<XILImage> const &j) -> bool { return j.get() == img; };
     iter f = std::find_if(ximgs_.begin(), ximgs_.end(), pred);
@@ -586,10 +600,14 @@ XWindow::handover(XWindow &recip, XILImage *img) noexcept
         return false;
     }
     ximgs_.erase(f);
+    img->move_to(pt);
     fmt::print(stderr, "handover after - source\n");
     dumpimgs();
     fmt::print(stderr, "handover after - recip\n");
     recip.dumpimgs();
+    // debug
+    pt = img->wbox_.topLeft();
+    saypoint(*(img->parent_), pt);
     return true;
 }
 

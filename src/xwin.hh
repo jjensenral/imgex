@@ -123,7 +123,7 @@ public:
 	XILImage(XWindow &, std::unique_ptr<Image>, QString const &);
 	~XILImage();
 	XILImage(XILImage const &) = delete;
-    // base class QImage has deleted move constructor
+    // base class QWindow has deleted move constructor!
 	XILImage(XILImage &&) = delete;
 	XILImage &operator=(XILImage const &) = delete;
     XILImage &operator=(XILImage &&) = delete;
